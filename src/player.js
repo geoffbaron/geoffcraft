@@ -52,9 +52,9 @@ export class Player {
 
     getRightDir() {
         return new THREE.Vector3(
-            -Math.cos(this.rotation.y),
+            Math.cos(this.rotation.y),
             0,
-            Math.sin(this.rotation.y)
+            -Math.sin(this.rotation.y)
         ).normalize();
     }
 
@@ -173,7 +173,7 @@ export class Player {
         return false;
     }
 
-    // Find safe spawn position on dry land — uses world.getHeight() (no chunk data needed)
+    // Find safe spawn position on dry land, clear of obstacles (trees, etc.)
     findSpawnPosition() {
         const WATER_LEVEL = 32;
         for (let r = 0; r <= 24; r++) {
@@ -184,7 +184,11 @@ export class Player {
                 ];
                 for (const [sx, sz] of checks) {
                     const h = this.world.getHeight(sx, sz);
-                    if (h > WATER_LEVEL + 1) {
+                    if (h <= WATER_LEVEL + 1) continue;
+                    // Verify the 2 blocks above the surface are not solid (e.g. tree trunks)
+                    const b1 = this.world.getBlock(sx, h + 1, sz);
+                    const b2 = this.world.getBlock(sx, h + 2, sz);
+                    if (!isBlockSolid(b1) && !isBlockSolid(b2)) {
                         this.position.set(sx + 0.5, h + 1.01, sz + 0.5);
                         return;
                     }
