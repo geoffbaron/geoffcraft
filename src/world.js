@@ -167,10 +167,10 @@ export class World {
                     } else if (y < height - 4) {
                         block = BlockType.STONE;
 
-                        // Caves
+                        // Caves — slightly more open (lower threshold, closer to surface)
                         const caveVal = this.caveNoise.noise3D(wx * 0.05, y * 0.07, wz * 0.05);
                         const caveVal2 = this.caveNoise.noise3D(wx * 0.08, y * 0.1, wz * 0.08);
-                        if (caveVal > 0.45 && caveVal2 > 0.4 && y > 5 && y < height - 8) {
+                        if (caveVal > 0.40 && caveVal2 > 0.36 && y > 5 && y < height - 5) {
                             block = BlockType.AIR;
                         } else {
                             // Ores
@@ -243,6 +243,25 @@ export class World {
                             const gv = this.oreNoise.noise3D(wx * 0.2, y * 0.2, wz * 0.2);
                             if (gv > 0.5) chunk.setBlock(x, y, z, BlockType.GRAVEL);
                         }
+                    }
+                }
+            }
+        }
+
+        // Torch placement — scan for cave floor positions (air on solid stone below)
+        for (let x = 0; x < CHUNK_SIZE; x++) {
+            for (let z = 0; z < CHUNK_SIZE; z++) {
+                const wx = worldX + x;
+                const wz = worldZ + z;
+                const height = this.getHeight(wx, wz);
+                for (let y = 6; y < height - 5; y++) {
+                    if (chunk.getBlock(x, y, z) !== BlockType.AIR) continue;
+                    if (chunk.getBlock(x, y - 1, z) !== BlockType.STONE) continue;
+                    if (chunk.getBlock(x, y + 1, z) !== BlockType.AIR) continue;
+                    // Deterministic hash — ~1 torch per 40 eligible floor tiles
+                    const h = Math.abs(Math.imul(wx * 374761393 + wz * 1013904223, y * 1664525 + 1));
+                    if (h % 40 === 0) {
+                        chunk.setBlock(x, y, z, BlockType.TORCH);
                     }
                 }
             }

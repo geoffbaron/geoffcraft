@@ -19,6 +19,7 @@ export const BlockType = {
     BRICK: 16,
     ICE: 17,
     MOSSY_COBBLE: 18,
+    TORCH: 19,
 };
 
 // Block properties
@@ -42,6 +43,7 @@ export const BlockData = {
     [BlockType.BRICK]:       { name: 'Brick',       solid: true,  transparent: false },
     [BlockType.ICE]:         { name: 'Ice',         solid: true,  transparent: true  },
     [BlockType.MOSSY_COBBLE]:{ name: 'Mossy Stone', solid: true,  transparent: false },
+    [BlockType.TORCH]:       { name: 'Torch',       solid: false, transparent: true  },
 };
 
 // Color definitions for each block face [top, bottom, side] as RGB arrays

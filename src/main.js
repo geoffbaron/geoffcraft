@@ -84,6 +84,17 @@ class Game {
         }
         this.scene.add(this.clouds);
 
+        // Torch light pool — up to 24 flickering PointLights for cave torches
+        this.torchLights = [];
+        for (let i = 0; i < 24; i++) {
+            const pl = new THREE.PointLight(0xff7722, 0, 14, 2);
+            pl.visible = false;
+            this.scene.add(pl);
+            this.torchLights.push(pl);
+        }
+        this.torchRefresh   = 0;           // countdown until next torch scan
+        this.activeTorches  = [];          // flat [x,y,z, ...] of active torch flame positions
+
         // Player
         this.player = new Player(this.camera, this.world);
         this.player.findSpawnPosition();
@@ -237,6 +248,9 @@ class Game {
             }
         }
 
+        // Update flickering torch lights
+        this.updateTorchLights(dt, now);
+
         // Animate water flowing
         if (this.faceTextures && this.faceTextures[BlockType.WATER]) {
             const time = now / 1000;
@@ -267,6 +281,70 @@ class Game {
         this.ui.updateDebugInfo(this.player, this.fps);
 
         this.renderer.render(this.scene, this.camera);
+    }
+
+    updateTorchLights(dt, now) {
+        const t = now / 1000;
+        const px = this.player.position.x;
+        const py = this.player.position.y;
+        const pz = this.player.position.z;
+
+        // Re-scan nearby chunks for torch positions every 2 s or on first call
+        this.torchRefresh -= dt;
+        if (this.torchRefresh <= 0) {
+            this.torchRefresh = 2.0;
+            this.activeTorches = [];
+
+            const pcx = Math.floor(px / 16);
+            const pcz = Math.floor(pz / 16);
+            // Collect all torch positions within 4-chunk radius
+            const candidates = [];
+            for (let dx = -4; dx <= 4; dx++) {
+                for (let dz = -4; dz <= 4; dz++) {
+                    const chunk = this.world.getChunk(pcx + dx, pcz + dz);
+                    if (!chunk || !chunk.torchWorldPositions) continue;
+                    const tp = chunk.torchWorldPositions;
+                    for (let i = 0; i < tp.length; i += 3) {
+                        const ddx = tp[i]   - px;
+                        const ddy = tp[i+1] - py;
+                        const ddz = tp[i+2] - pz;
+                        const dist2 = ddx*ddx + ddy*ddy + ddz*ddz;
+                        if (dist2 < 60 * 60) { // within 60 blocks
+                            candidates.push({ x: tp[i], y: tp[i+1], z: tp[i+2], dist2 });
+                        }
+                    }
+                }
+            }
+            // Sort by distance, keep closest 24
+            candidates.sort((a, b) => a.dist2 - b.dist2);
+            const take = Math.min(candidates.length, this.torchLights.length);
+            for (let i = 0; i < take; i++) {
+                this.activeTorches.push(candidates[i].x, candidates[i].y, candidates[i].z);
+            }
+        }
+
+        // Animate each active torch light with multi-frequency flicker
+        const count = Math.min(this.activeTorches.length / 3, this.torchLights.length);
+        for (let i = 0; i < this.torchLights.length; i++) {
+            const light = this.torchLights[i];
+            if (i < count) {
+                const tx = this.activeTorches[i * 3];
+                const ty = this.activeTorches[i * 3 + 1];
+                const tz = this.activeTorches[i * 3 + 2];
+                light.position.set(tx, ty, tz);
+                // Unique multi-frequency flicker per torch index
+                const ph = i * 2.399; // golden-angle phase spread
+                const flicker =
+                    Math.sin(t * 7.3  + ph)       * 0.18 +
+                    Math.sin(t * 13.7 + ph * 1.9) * 0.09 +
+                    Math.sin(t * 3.1  + ph * 0.6) * 0.06 +
+                    (Math.random() < 0.01 ? (Math.random() - 0.5) * 0.4 : 0); // rare pop
+                light.intensity = Math.max(0.5, 1.4 + flicker);
+                light.visible = true;
+            } else {
+                light.visible = false;
+            }
+        }
     }
 }
 

@@ -176,6 +176,12 @@ export class Chunk {
             this.waterMesh.geometry.dispose();
             this.waterMesh = null;
         }
+        if (this.torchMesh) {
+            this.world.scene.remove(this.torchMesh);
+            this.torchMesh.material.dispose();
+            this.torchMesh.geometry.dispose();
+            this.torchMesh = null;
+        }
 
         // Group geometry by material key (blockType + faceType)
         const groups = {};
@@ -185,7 +191,8 @@ export class Chunk {
             for (let z = 0; z < CHUNK_SIZE; z++) {
                 for (let x = 0; x < CHUNK_SIZE; x++) {
                     const block = this.blocks[this.getIndex(x, y, z)];
-                    if (block === BlockType.AIR) continue;
+                    // Skip AIR and TORCH (torch gets its own cross mesh)
+                    if (block === BlockType.AIR || block === BlockType.TORCH) continue;
                     const isWater = block === BlockType.WATER;
 
                     for (const face of FACES) {
@@ -333,7 +340,88 @@ export class Chunk {
             this.world.scene.add(this.waterMesh);
         }
 
+        // Build torch cross mesh
+        this.buildTorchMesh();
+
         this.dirty = false;
+    }
+
+    buildTorchMesh() {
+        if (this.torchMesh) {
+            this.world.scene.remove(this.torchMesh);
+            this.torchMesh.material.dispose();
+            this.torchMesh.geometry.dispose();
+            this.torchMesh = null;
+        }
+        this.torchWorldPositions = []; // [x,y,z, ...] world-space flame positions for PointLights
+
+        const positions = [];
+        const colors    = [];
+        const indices   = [];
+        let vc = 0;
+
+        const worldX = this.cx * CHUNK_SIZE;
+        const worldZ = this.cz * CHUNK_SIZE;
+
+        for (let lz = 0; lz < CHUNK_SIZE; lz++) {
+            for (let lx = 0; lx < CHUNK_SIZE; lx++) {
+                for (let ly = 0; ly < CHUNK_HEIGHT; ly++) {
+                    if (this.blocks[this.getIndex(lx, ly, lz)] !== BlockType.TORCH) continue;
+
+                    const wx = worldX + lx + 0.5;
+                    const wy = ly;
+                    const wz = worldZ + lz + 0.5;
+
+                    // Record flame-tip for PointLight placement
+                    this.torchWorldPositions.push(wx, wy + 0.75, wz);
+
+                    const sw = 0.06;            // stick half-width
+                    const sh = 0.55;            // stick height
+                    const fw = 0.18;            // flame half-width
+                    const fb = wy + sh;         // flame bottom y
+                    const ft = wy + sh + 0.18;  // flame top y
+
+                    // 4 quads: stick X, stick Z, flame X, flame Z
+                    const quads = [
+                        [wx-sw, wy, wz,    wx+sw, wy, wz,    wx+sw, wy+sh, wz,    wx-sw, wy+sh, wz],
+                        [wx, wy, wz-sw,    wx, wy, wz+sw,    wx, wy+sh, wz+sw,    wx, wy+sh, wz-sw],
+                        [wx-fw, fb, wz,    wx+fw, fb, wz,    wx+fw, ft, wz,        wx-fw, ft, wz],
+                        [wx, fb, wz-fw,    wx, fb, wz+fw,    wx, ft, wz+fw,        wx, ft, wz-fw],
+                    ];
+
+                    for (let qi = 0; qi < 4; qi++) {
+                        const flame = qi >= 2;
+                        const q = quads[qi];
+                        for (let vi = 0; vi < 4; vi++) {
+                            positions.push(q[vi*3], q[vi*3+1], q[vi*3+2]);
+                            const top = vi >= 2;
+                            if (flame) {
+                                colors.push(1.0, top ? 1.0 : 0.55, top ? 0.6 : 0.0); // yellow→orange
+                            } else {
+                                colors.push(top ? 0.85 : 0.28, top ? 0.45 : 0.16, 0.04); // brown stick
+                            }
+                        }
+                        indices.push(vc, vc+1, vc+2,  vc, vc+2, vc+3);
+                        vc += 4;
+                    }
+                }
+            }
+        }
+
+        if (positions.length === 0) return;
+
+        const geo = new THREE.BufferGeometry();
+        geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+        geo.setAttribute('color',    new THREE.Float32BufferAttribute(colors,    3));
+        geo.setIndex(indices);
+
+        this.torchMesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({
+            vertexColors: true,
+            side: THREE.DoubleSide,
+            transparent: true,
+            depthWrite: false,
+        }));
+        this.world.scene.add(this.torchMesh);
     }
 
     dispose() {
@@ -352,6 +440,12 @@ export class Chunk {
             this.waterMesh.geometry.dispose();
             this.waterMesh.material.dispose();
             this.waterMesh = null;
+        }
+        if (this.torchMesh) {
+            this.world.scene.remove(this.torchMesh);
+            this.torchMesh.geometry.dispose();
+            this.torchMesh.material.dispose();
+            this.torchMesh = null;
         }
     }
 }
