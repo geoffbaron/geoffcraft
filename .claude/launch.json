@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "geoffcraft",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["serve", "-l", "3000", "/Users/geoffbaron/Desktop/geoffcraft"],
+      "port": 3000
+    }
+  ]
+}

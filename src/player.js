@@ -1,0 +1,196 @@
+import * as THREE from 'three';
+import { isBlockSolid, BlockType } from './blocks.js';
+
+const GRAVITY = 25;
+const JUMP_FORCE = 9;
+const MOVE_SPEED = 5;
+const SPRINT_SPEED = 8;
+const PLAYER_HEIGHT = 1.7;
+const PLAYER_WIDTH = 0.3;
+const MOUSE_SENSITIVITY = 0.002;
+
+export class Player {
+    constructor(camera, world) {
+        this.camera = camera;
+        this.world = world;
+
+        this.position = new THREE.Vector3(0, 80, 0);
+        this.velocity = new THREE.Vector3(0, 0, 0);
+        this.rotation = { x: 0, y: 0 }; // pitch, yaw
+
+        this.onGround = false;
+        this.sprinting = false;
+
+        this.keys = {};
+        this.mouseLocked = false;
+
+        this.setupControls();
+    }
+
+    setupControls() {
+        document.addEventListener('keydown', (e) => {
+            this.keys[e.code] = true;
+        });
+        document.addEventListener('keyup', (e) => {
+            this.keys[e.code] = false;
+        });
+        document.addEventListener('mousemove', (e) => {
+            if (!this.mouseLocked) return;
+            this.rotation.y -= e.movementX * MOUSE_SENSITIVITY;
+            this.rotation.x -= e.movementY * MOUSE_SENSITIVITY;
+            this.rotation.x = Math.max(-Math.PI / 2 + 0.01, Math.min(Math.PI / 2 - 0.01, this.rotation.x));
+        });
+    }
+
+    getForwardDir() {
+        return new THREE.Vector3(
+            -Math.sin(this.rotation.y),
+            0,
+            -Math.cos(this.rotation.y)
+        ).normalize();
+    }
+
+    getRightDir() {
+        return new THREE.Vector3(
+            -Math.cos(this.rotation.y),
+            0,
+            Math.sin(this.rotation.y)
+        ).normalize();
+    }
+
+    getLookDirection() {
+        const dir = new THREE.Vector3();
+        dir.x = -Math.sin(this.rotation.y) * Math.cos(this.rotation.x);
+        dir.y = Math.sin(this.rotation.x);
+        dir.z = -Math.cos(this.rotation.y) * Math.cos(this.rotation.x);
+        return dir.normalize();
+    }
+
+    update(dt) {
+        dt = Math.min(dt, 0.05); // Cap delta time
+
+        this.sprinting = this.keys['ShiftLeft'] || this.keys['ShiftRight'];
+        const speed = this.sprinting ? SPRINT_SPEED : MOVE_SPEED;
+
+        // Movement input
+        const forward = this.getForwardDir();
+        const right = this.getRightDir();
+        const moveDir = new THREE.Vector3(0, 0, 0);
+
+        if (this.keys['KeyW'] || this.keys['ArrowUp']) moveDir.add(forward);
+        if (this.keys['KeyS'] || this.keys['ArrowDown']) moveDir.sub(forward);
+        if (this.keys['KeyA'] || this.keys['ArrowLeft']) moveDir.add(right);
+        if (this.keys['KeyD'] || this.keys['ArrowRight']) moveDir.sub(right);
+
+        if (moveDir.length() > 0) {
+            moveDir.normalize().multiplyScalar(speed);
+        }
+
+        this.velocity.x = moveDir.x;
+        this.velocity.z = moveDir.z;
+
+        // Gravity
+        this.velocity.y -= GRAVITY * dt;
+
+        // Jump
+        if ((this.keys['Space']) && this.onGround) {
+            this.velocity.y = JUMP_FORCE;
+            this.onGround = false;
+        }
+
+        // Apply velocity with collision
+        this.moveWithCollision(dt);
+
+        // Update camera
+        this.camera.position.copy(this.position);
+        this.camera.position.y += PLAYER_HEIGHT;
+
+        const euler = new THREE.Euler(this.rotation.x, this.rotation.y, 0, 'YXZ');
+        this.camera.quaternion.setFromEuler(euler);
+    }
+
+    moveWithCollision(dt) {
+        // Move each axis independently for better collision
+        const newPos = this.position.clone();
+
+        // X axis
+        newPos.x += this.velocity.x * dt;
+        if (this.collidesAt(newPos)) {
+            newPos.x = this.position.x;
+            this.velocity.x = 0;
+        }
+
+        // Z axis
+        newPos.z += this.velocity.z * dt;
+        if (this.collidesAt(newPos)) {
+            newPos.z = this.position.z;
+            this.velocity.z = 0;
+        }
+
+        // Y axis
+        newPos.y += this.velocity.y * dt;
+        if (this.collidesAt(newPos)) {
+            if (this.velocity.y < 0) {
+                // Landing - snap to block top
+                newPos.y = Math.floor(this.position.y) + 0.001;
+                // Double check if this snap position is also colliding
+                if (this.collidesAt(newPos)) {
+                    newPos.y = this.position.y;
+                }
+                this.onGround = true;
+            } else {
+                // Hit ceiling
+                newPos.y = this.position.y;
+            }
+            this.velocity.y = 0;
+        } else {
+            this.onGround = false;
+        }
+
+        this.position.copy(newPos);
+    }
+
+    collidesAt(pos) {
+        const w = PLAYER_WIDTH;
+        // Check corners of player AABB
+        for (let dx = -1; dx <= 1; dx += 2) {
+            for (let dz = -1; dz <= 1; dz += 2) {
+                for (let dy = 0; dy <= 1; dy++) {
+                    const checkY = dy === 0 ? pos.y : pos.y + PLAYER_HEIGHT;
+                    const bx = Math.floor(pos.x + dx * w);
+                    const by = Math.floor(checkY);
+                    const bz = Math.floor(pos.z + dz * w);
+                    if (isBlockSolid(this.world.getBlock(bx, by, bz))) {
+                        return true;
+                    }
+                }
+            }
+        }
+        // Check feet center
+        if (isBlockSolid(this.world.getBlock(Math.floor(pos.x), Math.floor(pos.y), Math.floor(pos.z)))) {
+            return true;
+        }
+        return false;
+    }
+
+    // Find safe spawn position on dry land — uses world.getHeight() (no chunk data needed)
+    findSpawnPosition() {
+        const WATER_LEVEL = 32;
+        for (let r = 0; r <= 24; r++) {
+            for (let i = -r; i <= r; i++) {
+                const checks = [
+                    [i * 12, -r * 12], [i * 12, r * 12],
+                    [-r * 12, i * 12], [r * 12, i * 12],
+                ];
+                for (const [sx, sz] of checks) {
+                    const h = this.world.getHeight(sx, sz);
+                    if (h > WATER_LEVEL + 1) {
+                        this.position.set(sx + 0.5, h + 1.01, sz + 0.5);
+                        return;
+                    }
+                }
+            }
+        }
+        this.position.set(0.5, 90, 0.5);
+    }
+}
