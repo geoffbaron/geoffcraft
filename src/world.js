@@ -267,10 +267,127 @@ export class World {
             }
         }
 
+        this.generateCaveEntrances(chunk, cx, cz, worldX, worldZ);
+
         this.generateStructures(chunk, cx, cz);
 
         this.chunks.set(key, chunk);
         return chunk;
+    }
+
+    generateCaveEntrances(chunk, cx, cz, worldX, worldZ) {
+        const hash = chunkStructureHash(cx, cz);
+
+        // ── 1. Sinkhole/crater entrance (~1 in 3 chunks) ──────────────────────
+        const sHash = (hash ^ 0xCA7E0) >>> 0;
+        if (sHash % 3 === 0) {
+            const ex = 4 + (sHash % (CHUNK_SIZE - 8));
+            const ez = 4 + ((sHash >>> 8) % (CHUNK_SIZE - 8));
+            const ewx = worldX + ex, ewz = worldZ + ez;
+            const eh  = this.getHeight(ewx, ewz);
+
+            if (eh > WATER_LEVEL + 10 && eh < 70) {
+                const topR  = 3 + (sHash & 1);       // opening radius 3 or 4
+                const depth = 20 + (sHash >> 4 & 7); // shaft depth 20–27 blocks
+
+                for (let d = 0; d <= depth; d++) {
+                    const y = eh - d;
+                    if (y < 4) break;
+                    // Funnel: wide bowl at top, narrows to a shaft at d = topR
+                    const r  = d < topR ? topR + 1.5 - d : 1.6;
+                    const ri = Math.ceil(r);
+                    for (let dx = -ri; dx <= ri; dx++) {
+                        for (let dz = -ri; dz <= ri; dz++) {
+                            if (dx * dx + dz * dz <= r * r) {
+                                const bx = ex + dx, bz = ez + dz;
+                                if (bx >= 0 && bx < CHUNK_SIZE && bz >= 0 && bz < CHUNK_SIZE)
+                                    chunk.setBlock(bx, y, bz, BlockType.AIR);
+                            }
+                        }
+                    }
+                }
+
+                // Torches spaced along the shaft floor
+                for (let td = topR + 5; td < depth; td += 7) {
+                    const ty = eh - td;
+                    if (ty < 5) break;
+                    if (chunk.getBlock(ex, ty, ez) === BlockType.AIR &&
+                        isBlockSolid(chunk.getBlock(ex, ty - 1, ez))) {
+                        chunk.setBlock(ex, ty, ez, BlockType.TORCH);
+                    }
+                }
+            }
+        }
+
+        // ── 2. Hillside mine arch (~1 in 3 chunks, different pattern) ─────────
+        const hHash = (hash ^ 0xA4C47) >>> 0;
+        if (hHash % 3 === 1) {
+            const ex = 4 + (hHash % (CHUNK_SIZE - 8));
+            const ez = 4 + ((hHash >>> 8) % (CHUNK_SIZE - 8));
+            const ewx = worldX + ex, ewz = worldZ + ez;
+            const ehLow = this.getHeight(ewx, ewz);
+
+            if (ehLow > WATER_LEVEL + 6 && ehLow < 75) {
+                // Find the steepest adjacent slope (must rise ≥8 blocks in 5 steps)
+                const DIRS = [[1,0],[-1,0],[0,1],[0,-1]];
+                let archDir = null, bestSlope = 7;
+                for (const [adx, adz] of DIRS) {
+                    const slope = this.getHeight(ewx + adx * 5, ewz + adz * 5) - ehLow;
+                    if (slope > bestSlope) { bestSlope = slope; archDir = [adx, adz]; }
+                }
+
+                if (archDir) {
+                    const [adx, adz] = archDir;
+                    const archLen = 9 + (hHash >> 4 & 3); // tunnel 9–12 blocks deep
+                    const W = 1;   // half-width perpendicular to arch (total 3 wide)
+                    const H = 4;   // arch height
+
+                    // Carve the horizontal tunnel INTO the hillside
+                    for (let t = 0; t <= archLen; t++) {
+                        for (let s = -W; s <= W; s++) {
+                            for (let up = 0; up < H; up++) {
+                                // Perpendicular direction: (-adz, adx)
+                                const bx = ex + adx * t - adz * s;
+                                const bz = ez + adz * t + adx * s;
+                                const by = ehLow + up;
+                                if (bx >= 0 && bx < CHUNK_SIZE && bz >= 0 && bz < CHUNK_SIZE
+                                    && by >= 0 && by < CHUNK_HEIGHT)
+                                    chunk.setBlock(bx, by, bz, BlockType.AIR);
+                            }
+                        }
+                    }
+
+                    // Vertical shaft connecting tunnel to deeper cave network
+                    const sxEnd = ex + adx * archLen;
+                    const szEnd = ez + adz * archLen;
+                    const shaftDepth = 16 + (hHash >> 8 & 7);
+                    for (let d = 1; d <= shaftDepth; d++) {
+                        const sy = ehLow - d;
+                        if (sy < 4) break;
+                        for (let s = -W; s <= W; s++) {
+                            for (let t2 = -W; t2 <= W; t2++) {
+                                const bx = sxEnd - adz * s + adx * t2;
+                                const bz = szEnd + adx * s + adz * t2;
+                                if (bx >= 0 && bx < CHUNK_SIZE && bz >= 0 && bz < CHUNK_SIZE)
+                                    chunk.setBlock(bx, sy, bz, BlockType.AIR);
+                            }
+                        }
+                    }
+
+                    // Torches: one just inside entrance, one deep in the tunnel
+                    for (const torchT of [2, Math.floor(archLen * 0.65)]) {
+                        const tx = ex + adx * torchT;
+                        const tz = ez + adz * torchT;
+                        if (tx >= 0 && tx < CHUNK_SIZE && tz >= 0 && tz < CHUNK_SIZE) {
+                            if (chunk.getBlock(tx, ehLow, tz) === BlockType.AIR &&
+                                isBlockSolid(chunk.getBlock(tx, ehLow - 1, tz))) {
+                                chunk.setBlock(tx, ehLow, tz, BlockType.TORCH);
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 
     generateStructures(chunk, cx, cz) {
