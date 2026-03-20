@@ -1,6 +1,7 @@
 import { Chunk, CHUNK_SIZE, CHUNK_HEIGHT } from './chunk.js';
 import { BlockType, isBlockSolid } from './blocks.js';
 import { Noise } from './noise.js';
+import { chunkStructureHash, generateVillage, generateCastle } from './structures.js';
 
 const RENDER_DISTANCE = 8;
 const WATER_LEVEL = 32;
@@ -94,16 +95,38 @@ export class World {
         if (chunk) chunk.dirty = true;
     }
 
+    ridgedNoise(wx, wz, octaves = 6) {
+        // Ridged multifractal: produces sharp mountain ridges (1 - |noise|)
+        let value = 0, amp = 1, freq = 1, max = 0;
+        for (let i = 0; i < octaves; i++) {
+            const n = this.noise.noise2D(wx * freq, wz * freq);
+            value += (1.0 - Math.abs(n)) * amp;
+            max += amp;
+            amp *= 0.5;
+            freq *= 2.0;
+        }
+        return value / max; // [0, 1], peaks at 1
+    }
+
     getHeight(wx, wz) {
         // Base rolling plains / hills
         const base = this.noise.fbm(wx * 0.005, wz * 0.005, 4) * 0.5 + 0.5;
         let height = 30 + base * 18; // 30–48
 
-        // Mountain mask — offset coords so it decorrelates from base noise
-        // fbm * 0.5 + 0.5 gives ~[0.34, 0.68] in practice for this noise impl
-        const mNorm = this.noise.fbm(wx * 0.002 + 500, wz * 0.002 + 500, 5) * 0.5 + 0.5;
-        // Quadratic boost: mNorm^2 * 280 - 35 gives ~0 at mNorm=0.35, ~96 at mNorm=0.68
-        height += Math.max(0, mNorm * mNorm * 280 - 35);
+        // Mountain zone mask — large-scale blob that decides where mountains are
+        const mZone = this.noise.fbm(wx * 0.0008 + 500, wz * 0.0008 + 500, 3) * 0.5 + 0.5;
+        const mMask = Math.max(0, (mZone - 0.45) / 0.35); // 0 outside, ramps to 1 in mountain zones
+
+        if (mMask > 0) {
+            // Ridged noise gives jagged, sharp peaks
+            const ridge = this.ridgedNoise(wx * 0.004 + 300, wz * 0.004 + 300, 6);
+            // Additional fine-detail ridges for extra jaggedness
+            const ridge2 = this.ridgedNoise(wx * 0.009 + 700, wz * 0.009 + 700, 4);
+            const ridgeCombined = ridge * 0.7 + ridge2 * 0.3;
+            // Only the top portion of ridges forms peaks
+            const peakVal = Math.max(0, ridgeCombined - 0.4) / 0.6;
+            height += mMask * peakVal * peakVal * 110;
+        }
 
         // Ocean: separate low-frequency noise carves out seas
         const ocean = this.noise.fbm(wx * 0.0015 + 200, wz * 0.0015 + 200, 3) * 0.5 + 0.5;
@@ -161,6 +184,11 @@ export class World {
                     } else if (y < height) {
                         if (height < WATER_LEVEL + 2) {
                             block = BlockType.SAND;
+                        } else if (height > 95) {
+                            // High alpine: ICE at very peak, then snow, then stone
+                            if (y > height - 2) block = BlockType.ICE;
+                            else if (y > height - 5) block = BlockType.SNOW;
+                            else block = BlockType.STONE;
                         } else if (height > 72) {
                             block = (y > height - 3) ? BlockType.SNOW : BlockType.STONE;
                         } else {
@@ -171,6 +199,8 @@ export class World {
                             block = BlockType.SAND;
                         } else if (height < WATER_LEVEL + 2) {
                             block = BlockType.SAND;
+                        } else if (height > 95) {
+                            block = BlockType.ICE;
                         } else if (height > 72) {
                             block = BlockType.SNOW;
                         } else {
@@ -218,8 +248,34 @@ export class World {
             }
         }
 
+        this.generateStructures(chunk, cx, cz);
+
         this.chunks.set(key, chunk);
         return chunk;
+    }
+
+    generateStructures(chunk, cx, cz) {
+        const hash = chunkStructureHash(cx, cz);
+
+        // Village: ~1 in 18 chunks, on flat-ish terrain below snow line
+        if (hash % 18 === 0) {
+            const wx = cx * CHUNK_SIZE + 8;
+            const wz = cz * CHUNK_SIZE + 8;
+            const h = this.getHeight(wx, wz);
+            if (h > WATER_LEVEL + 4 && h < 65) {
+                generateVillage(chunk, wx, h, wz, cx * CHUNK_SIZE, cz * CHUNK_SIZE, hash);
+            }
+        }
+
+        // Castle: ~1 in 80 chunks, on moderately elevated terrain
+        if (hash % 80 === 5) {
+            const wx = cx * CHUNK_SIZE + 8;
+            const wz = cz * CHUNK_SIZE + 8;
+            const h = this.getHeight(wx, wz);
+            if (h > WATER_LEVEL + 6 && h < 70) {
+                generateCastle(chunk, wx, h, wz, cx * CHUNK_SIZE, cz * CHUNK_SIZE);
+            }
+        }
     }
 
     placeTree(chunk, x, baseY, z) {

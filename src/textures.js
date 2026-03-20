@@ -322,6 +322,50 @@ export function createTextureAtlas() {
     const brickTex = canvasToTexture(generateBrick());
     faceTextures[BlockType.BRICK] = { top: brickTex, side: brickTex, bottom: brickTex };
 
+    // Ice — semi-transparent blue with crackle pattern
+    const iceCanvas = createCanvas();
+    const iceCtx = iceCanvas.getContext('2d');
+    const iceData = iceCtx.createImageData(TEX_SIZE, TEX_SIZE);
+    for (let y = 0; y < TEX_SIZE; y++) {
+        for (let x = 0; x < TEX_SIZE; x++) {
+            const n = (noise(x, y, 60) - 0.5) * 0.08;
+            const crack = (noise(x + y * 0.7, y * 0.9, 61) > 0.78) ? -0.12 : 0;
+            const idx = (y * TEX_SIZE + x) * 4;
+            iceData.data[idx]     = Math.max(0, Math.min(255, (0.55 + n + crack) * 255));
+            iceData.data[idx + 1] = Math.max(0, Math.min(255, (0.75 + n + crack * 0.5) * 255));
+            iceData.data[idx + 2] = Math.max(0, Math.min(255, (0.95 + n) * 255));
+            iceData.data[idx + 3] = 200;
+        }
+    }
+    iceCtx.putImageData(iceData, 0, 0);
+    const iceTex = canvasToTexture(iceCanvas);
+    faceTextures[BlockType.ICE] = { top: iceTex, side: iceTex, bottom: iceTex };
+
+    // Mossy cobblestone — stone with green patches
+    const mossyCanvas = createCanvas();
+    const mossyCtx = mossyCanvas.getContext('2d');
+    const mossyData = mossyCtx.createImageData(TEX_SIZE, TEX_SIZE);
+    for (let y = 0; y < TEX_SIZE; y++) {
+        for (let x = 0; x < TEX_SIZE; x++) {
+            const n = (noise(x, y, 70) - 0.5) * 0.1;
+            const mossy = noise(x * 1.2, y * 1.2, 71) > 0.6;
+            const idx = (y * TEX_SIZE + x) * 4;
+            if (mossy) {
+                mossyData.data[idx]     = Math.max(0, Math.min(255, (0.25 + n) * 255));
+                mossyData.data[idx + 1] = Math.max(0, Math.min(255, (0.45 + n) * 255));
+                mossyData.data[idx + 2] = Math.max(0, Math.min(255, (0.2 + n) * 255));
+            } else {
+                mossyData.data[idx]     = Math.max(0, Math.min(255, (0.42 + n) * 255));
+                mossyData.data[idx + 1] = Math.max(0, Math.min(255, (0.42 + n) * 255));
+                mossyData.data[idx + 2] = Math.max(0, Math.min(255, (0.42 + n) * 255));
+            }
+            mossyData.data[idx + 3] = 255;
+        }
+    }
+    mossyCtx.putImageData(mossyData, 0, 0);
+    const mossyTex = canvasToTexture(mossyCanvas);
+    faceTextures[BlockType.MOSSY_COBBLE] = { top: mossyTex, side: mossyTex, bottom: mossyTex };
+
     return faceTextures;
 }
 

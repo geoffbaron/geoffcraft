@@ -17,6 +17,8 @@ export const BlockType = {
     IRON_ORE: 14,
     GLASS: 15,
     BRICK: 16,
+    ICE: 17,
+    MOSSY_COBBLE: 18,
 };
 
 // Block properties
@@ -38,6 +40,8 @@ export const BlockData = {
     [BlockType.IRON_ORE]:    { name: 'Iron Ore',    solid: true,  transparent: false },
     [BlockType.GLASS]:       { name: 'Glass',       solid: true,  transparent: true  },
     [BlockType.BRICK]:       { name: 'Brick',       solid: true,  transparent: false },
+    [BlockType.ICE]:         { name: 'Ice',         solid: true,  transparent: true  },
+    [BlockType.MOSSY_COBBLE]:{ name: 'Mossy Stone', solid: true,  transparent: false },
 };
 
 // Color definitions for each block face [top, bottom, side] as RGB arrays
@@ -58,6 +62,8 @@ export const BlockColors = {
     [BlockType.IRON_ORE]:    { top: [0.55, 0.5, 0.48], bottom: [0.55, 0.5, 0.48], side: [0.52, 0.47, 0.45] },
     [BlockType.GLASS]:       { top: [0.8, 0.9, 0.95],  bottom: [0.8, 0.9, 0.95],  side: [0.8, 0.9, 0.95] },
     [BlockType.BRICK]:       { top: [0.6, 0.3, 0.25],  bottom: [0.6, 0.3, 0.25],  side: [0.58, 0.28, 0.22] },
+    [BlockType.ICE]:         { top: [0.55, 0.75, 0.95], bottom: [0.55, 0.75, 0.95], side: [0.5, 0.7, 0.92] },
+    [BlockType.MOSSY_COBBLE]:{ top: [0.35, 0.45, 0.32], bottom: [0.35, 0.45, 0.32], side: [0.33, 0.43, 0.3] },
 };
 
 export function isBlockSolid(type) {
