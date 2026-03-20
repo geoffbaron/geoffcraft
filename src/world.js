@@ -1,7 +1,7 @@
 import { Chunk, CHUNK_SIZE, CHUNK_HEIGHT } from './chunk.js';
 import { BlockType, isBlockSolid } from './blocks.js';
 import { Noise } from './noise.js';
-import { chunkStructureHash, generateVillage, generateCastle } from './structures.js';
+import { chunkStructureHash, generateVillage, generateCastle, generateWatchtower, generateRuins } from './structures.js';
 
 const RENDER_DISTANCE = 8;
 const WATER_LEVEL = 32;
@@ -103,9 +103,9 @@ export class World {
             value += (1.0 - Math.abs(n)) * amp;
             max += amp;
             amp *= 0.5;
-            freq *= 2.0;
+            freq *= 2.1; // slightly non-integer for less grid regularity
         }
-        return value / max; // [0, 1], peaks at 1
+        return value / max; // measured range: [0.44, 0.99], avg ~0.80
     }
 
     getHeight(wx, wz) {
@@ -113,25 +113,25 @@ export class World {
         const base = this.noise.fbm(wx * 0.005, wz * 0.005, 4) * 0.5 + 0.5;
         let height = 30 + base * 18; // 30–48
 
-        // Mountain zone mask — large-scale blob that decides where mountains are
-        const mZone = this.noise.fbm(wx * 0.0008 + 500, wz * 0.0008 + 500, 3) * 0.5 + 0.5;
-        const mMask = Math.max(0, (mZone - 0.45) / 0.35); // 0 outside, ramps to 1 in mountain zones
+        // Mountain zone mask — measured fbm range here is ~[0.37, 0.62]
+        // Frequency 0.002 → mountain ranges spaced ~300-500 blocks apart
+        const mZone = this.noise.fbm(wx * 0.002 + 500, wz * 0.002 + 500, 4) * 0.5 + 0.5;
+        // Normalize over actual range: threshold 0.46, max ~0.62 → mMask [0,1]
+        const mMask = Math.min(1, Math.max(0, (mZone - 0.46) / 0.16));
 
         if (mMask > 0) {
-            // Ridged noise gives jagged, sharp peaks
-            const ridge = this.ridgedNoise(wx * 0.004 + 300, wz * 0.004 + 300, 6);
-            // Additional fine-detail ridges for extra jaggedness
-            const ridge2 = this.ridgedNoise(wx * 0.009 + 700, wz * 0.009 + 700, 4);
-            const ridgeCombined = ridge * 0.7 + ridge2 * 0.3;
-            // Only the top portion of ridges forms peaks
-            const peakVal = Math.max(0, ridgeCombined - 0.4) / 0.6;
-            height += mMask * peakVal * peakVal * 110;
+            const ridge = this.ridgedNoise(wx * 0.006 + 300, wz * 0.006 + 300, 6);
+            const ridge2 = this.ridgedNoise(wx * 0.015 + 700, wz * 0.015 + 700, 4);
+            // Normalize ridged from measured [0.44, 0.99] → [0, 1]
+            const rc = Math.max(0, (ridge * 0.65 + ridge2 * 0.35 - 0.44) / 0.55);
+            // Base mountain elevation + sharp jagged peaks
+            height += mMask * (22 + rc * rc * 115);
         }
 
         // Ocean: separate low-frequency noise carves out seas
         const ocean = this.noise.fbm(wx * 0.0015 + 200, wz * 0.0015 + 200, 3) * 0.5 + 0.5;
-        if (ocean < 0.42) {
-            height -= (0.42 - ocean) * 70;
+        if (ocean < 0.46) {
+            height -= (0.46 - ocean) * 80;
         }
 
         // Rivers
@@ -256,25 +256,31 @@ export class World {
 
     generateStructures(chunk, cx, cz) {
         const hash = chunkStructureHash(cx, cz);
+        const wx = cx * CHUNK_SIZE + 8;
+        const wz = cz * CHUNK_SIZE + 8;
+        const h = this.getHeight(wx, wz);
 
-        // Village: ~1 in 18 chunks, on flat-ish terrain below snow line
-        if (hash % 18 === 0) {
-            const wx = cx * CHUNK_SIZE + 8;
-            const wz = cz * CHUNK_SIZE + 8;
-            const h = this.getHeight(wx, wz);
-            if (h > WATER_LEVEL + 4 && h < 65) {
-                generateVillage(chunk, wx, h, wz, cx * CHUNK_SIZE, cz * CHUNK_SIZE, hash);
-            }
+        // Village: ~1 in 18 chunks, flat land below snow line
+        if (hash % 18 === 0 && h > WATER_LEVEL + 4 && h < 62) {
+            generateVillage(chunk, wx, h, wz, cx * CHUNK_SIZE, cz * CHUNK_SIZE, hash);
+            return;
         }
 
-        // Castle: ~1 in 80 chunks, on moderately elevated terrain
-        if (hash % 80 === 5) {
-            const wx = cx * CHUNK_SIZE + 8;
-            const wz = cz * CHUNK_SIZE + 8;
-            const h = this.getHeight(wx, wz);
-            if (h > WATER_LEVEL + 6 && h < 70) {
-                generateCastle(chunk, wx, h, wz, cx * CHUNK_SIZE, cz * CHUNK_SIZE);
-            }
+        // Castle: ~1 in 60 chunks, on slightly elevated terrain
+        if (hash % 60 === 5 && h > WATER_LEVEL + 6 && h < 68) {
+            generateCastle(chunk, wx, h, wz, cx * CHUNK_SIZE, cz * CHUNK_SIZE, hash);
+            return;
+        }
+
+        // Watchtower: ~1 in 10 chunks, anywhere passable
+        if (hash % 10 === 3 && h > WATER_LEVEL + 2 && h < 80) {
+            generateWatchtower(chunk, wx, h, wz, cx * CHUNK_SIZE, cz * CHUNK_SIZE, hash);
+            return;
+        }
+
+        // Ruins: ~1 in 15 chunks, anywhere on land
+        if (hash % 15 === 7 && h > WATER_LEVEL + 2 && h < 75) {
+            generateRuins(chunk, wx, h, wz, cx * CHUNK_SIZE, cz * CHUNK_SIZE, hash);
         }
     }
 
