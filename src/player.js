@@ -79,8 +79,8 @@ export class Player {
 
         if (this.keys['KeyW'] || this.keys['ArrowUp']) moveDir.add(forward);
         if (this.keys['KeyS'] || this.keys['ArrowDown']) moveDir.sub(forward);
-        if (this.keys['KeyA'] || this.keys['ArrowLeft']) moveDir.add(right);
-        if (this.keys['KeyD'] || this.keys['ArrowRight']) moveDir.sub(right);
+        if (this.keys['KeyA'] || this.keys['ArrowLeft']) moveDir.sub(right);
+        if (this.keys['KeyD'] || this.keys['ArrowRight']) moveDir.add(right);
 
         if (moveDir.length() > 0) {
             moveDir.normalize().multiplyScalar(speed);

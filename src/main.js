@@ -158,12 +158,12 @@ class Game {
 
             if (!hit) return;
 
-            if (e.button === 2) {
-                // Right click - break
+            if (e.button === 0) {
+                // Left click - break
                 this.world.setBlock(hit.block.x, hit.block.y, hit.block.z, BlockType.AIR);
                 this.actionCooldown = 0.2;
-            } else if (e.button === 0) {
-                // Left click - place
+            } else if (e.button === 2) {
+                // Right click - place
                 const px = hit.block.x + hit.normal.x;
                 const py = hit.block.y + hit.normal.y;
                 const pz = hit.block.z + hit.normal.z;
