@@ -122,6 +122,7 @@ export class UI {
             `FPS: ${fps}`,
             `XYZ: ${pos.x.toFixed(1)} / ${pos.y.toFixed(1)} / ${pos.z.toFixed(1)}`,
             `Chunk: ${Math.floor(pos.x / 16)}, ${Math.floor(pos.z / 16)}`,
-        ].join('<br>');
+            player.flying ? `<span style="color:#7ef">✦ Flying (double-tap Space to land)</span>` : '',
+        ].filter(Boolean).join('<br>');
     }
 }

@@ -95,34 +95,31 @@ export class World {
     }
 
     getHeight(wx, wz) {
-        // Base terrain 
-        let h = this.noise.fbm(wx * 0.005, wz * 0.005, 4) * 0.5 + 0.5;
+        // Base rolling plains / hills
+        const base = this.noise.fbm(wx * 0.005, wz * 0.005, 4) * 0.5 + 0.5;
+        let height = 30 + base * 18; // 30–48
 
-        // Massive Mountain Noise
-        let mountainNoise = this.noise.fbm(wx * 0.002, wz * 0.002, 5);
-        
-        let height = 28 + h * 20; // 28 to 48 (Plains / Hills)
-        
-        // If mountain noise > -0.1, start pushing terrain up significantly!
-        if (mountainNoise > -0.1) {
-            let m = mountainNoise + 0.1; 
-            m = m * m; // Exponential spikes for jagged mountains
-            height += m * 140; // Max height can easily reach 100+
-        } 
-        // Oceans
-        else if (mountainNoise < -0.3) {
-            height -= Math.abs(mountainNoise + 0.3) * 40; 
+        // Mountain mask — offset coords so it decorrelates from base noise
+        // fbm * 0.5 + 0.5 gives ~[0.34, 0.68] in practice for this noise impl
+        const mNorm = this.noise.fbm(wx * 0.002 + 500, wz * 0.002 + 500, 5) * 0.5 + 0.5;
+        // Quadratic boost: mNorm^2 * 280 - 35 gives ~0 at mNorm=0.35, ~96 at mNorm=0.68
+        height += Math.max(0, mNorm * mNorm * 280 - 35);
+
+        // Ocean: separate low-frequency noise carves out seas
+        const ocean = this.noise.fbm(wx * 0.0015 + 200, wz * 0.0015 + 200, 3) * 0.5 + 0.5;
+        if (ocean < 0.42) {
+            height -= (0.42 - ocean) * 70;
         }
 
-        // Apply rivers
-        let riverNoise = this.noise.fbm(wx * 0.003 + 100, wz * 0.003 + 100, 3);
-        let riverDistance = Math.abs(riverNoise);
-        if (riverDistance < 0.04 && height > 30) {
-            height -= (1.0 - riverDistance / 0.04) * 15;
+        // Rivers
+        const river = this.noise.fbm(wx * 0.003 + 100, wz * 0.003 + 100, 3);
+        if (Math.abs(river) < 0.035 && height > 34) {
+            height -= (1.0 - Math.abs(river) / 0.035) * 12;
         }
 
-        let detail = this.noise.fbm(wx * 0.03, wz * 0.03, 3) * 0.5 + 0.5;
-        return Math.floor(Math.min(CHUNK_HEIGHT - 2, height + detail * 4)); // cap height
+        // Fine surface roughness
+        const detail = this.noise.fbm(wx * 0.04, wz * 0.04, 3) * 0.5 + 0.5;
+        return Math.floor(Math.min(CHUNK_HEIGHT - 2, height + detail * 5));
     }
 
     generateChunk(cx, cz) {
@@ -164,8 +161,7 @@ export class World {
                     } else if (y < height) {
                         if (height < WATER_LEVEL + 2) {
                             block = BlockType.SAND;
-                        } else if (height > 85) {
-                            // Under snow is snow or stone, not dirt
+                        } else if (height > 72) {
                             block = (y > height - 3) ? BlockType.SNOW : BlockType.STONE;
                         } else {
                             block = BlockType.DIRT;
@@ -175,7 +171,7 @@ export class World {
                             block = BlockType.SAND;
                         } else if (height < WATER_LEVEL + 2) {
                             block = BlockType.SAND;
-                        } else if (height > 85) {
+                        } else if (height > 72) {
                             block = BlockType.SNOW;
                         } else {
                             block = BlockType.GRASS;

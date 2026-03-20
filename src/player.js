@@ -5,6 +5,8 @@ const GRAVITY = 25;
 const JUMP_FORCE = 9;
 const MOVE_SPEED = 5;
 const SPRINT_SPEED = 8;
+const FLY_SPEED = 15;
+const FLY_SPRINT_SPEED = 40;
 const PLAYER_HEIGHT = 1.7;
 const PLAYER_WIDTH = 0.3;
 const MOUSE_SENSITIVITY = 0.002;
@@ -20,6 +22,8 @@ export class Player {
 
         this.onGround = false;
         this.sprinting = false;
+        this.flying = false;
+        this.lastSpaceTap = 0;
 
         this.keys = {};
         this.mouseLocked = false;
@@ -30,6 +34,15 @@ export class Player {
     setupControls() {
         document.addEventListener('keydown', (e) => {
             this.keys[e.code] = true;
+            // Double-tap Space to toggle fly mode
+            if (e.code === 'Space') {
+                const now = performance.now();
+                if (now - this.lastSpaceTap < 300) {
+                    this.flying = !this.flying;
+                    this.velocity.y = 0;
+                }
+                this.lastSpaceTap = now;
+            }
         });
         document.addEventListener('keyup', (e) => {
             this.keys[e.code] = false;
@@ -67,12 +80,10 @@ export class Player {
     }
 
     update(dt) {
-        dt = Math.min(dt, 0.05); // Cap delta time
+        dt = Math.min(dt, 0.05);
 
         this.sprinting = this.keys['ShiftLeft'] || this.keys['ShiftRight'];
-        const speed = this.sprinting ? SPRINT_SPEED : MOVE_SPEED;
 
-        // Movement input
         const forward = this.getForwardDir();
         const right = this.getRightDir();
         const moveDir = new THREE.Vector3(0, 0, 0);
@@ -82,29 +93,35 @@ export class Player {
         if (this.keys['KeyA'] || this.keys['ArrowLeft']) moveDir.sub(right);
         if (this.keys['KeyD'] || this.keys['ArrowRight']) moveDir.add(right);
 
-        if (moveDir.length() > 0) {
-            moveDir.normalize().multiplyScalar(speed);
+        if (this.flying) {
+            const flySpeed = this.sprinting ? FLY_SPRINT_SPEED : FLY_SPEED;
+            if (moveDir.length() > 0) moveDir.normalize().multiplyScalar(flySpeed);
+            this.velocity.x = moveDir.x;
+            this.velocity.z = moveDir.z;
+            // Space = fly up, Shift = fly down
+            if (this.keys['Space']) this.velocity.y = flySpeed;
+            else if (this.keys['ShiftLeft'] || this.keys['ShiftRight']) this.velocity.y = -flySpeed;
+            else this.velocity.y = 0;
+            // No collision in fly mode — move freely
+            this.position.addScaledVector(this.velocity, dt);
+        } else {
+            const speed = this.sprinting ? SPRINT_SPEED : MOVE_SPEED;
+            if (moveDir.length() > 0) moveDir.normalize().multiplyScalar(speed);
+            this.velocity.x = moveDir.x;
+            this.velocity.z = moveDir.z;
+            // Gravity
+            this.velocity.y -= GRAVITY * dt;
+            // Jump
+            if (this.keys['Space'] && this.onGround) {
+                this.velocity.y = JUMP_FORCE;
+                this.onGround = false;
+            }
+            this.moveWithCollision(dt);
         }
-
-        this.velocity.x = moveDir.x;
-        this.velocity.z = moveDir.z;
-
-        // Gravity
-        this.velocity.y -= GRAVITY * dt;
-
-        // Jump
-        if ((this.keys['Space']) && this.onGround) {
-            this.velocity.y = JUMP_FORCE;
-            this.onGround = false;
-        }
-
-        // Apply velocity with collision
-        this.moveWithCollision(dt);
 
         // Update camera
         this.camera.position.copy(this.position);
         this.camera.position.y += PLAYER_HEIGHT;
-
         const euler = new THREE.Euler(this.rotation.x, this.rotation.y, 0, 'YXZ');
         this.camera.quaternion.setFromEuler(euler);
     }
