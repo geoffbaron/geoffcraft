@@ -363,6 +363,9 @@ function generatePowerup(type) {
     } else if (type === BlockType.SHOE) {
         ctx.fillStyle = '#ff2222';
         ctx.fillRect(0, 0, TEX_SIZE, TEX_SIZE);
+        ctx.strokeStyle = '#ffff00'; // Thick yellow neon border
+        ctx.lineWidth = 4;
+        ctx.strokeRect(0, 0, TEX_SIZE, TEX_SIZE);
         ctx.fillStyle = '#ffffff';
         ctx.fillRect(4, 8, 8, 6);
         ctx.fillRect(8, 6, 4, 2);
