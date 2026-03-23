@@ -346,10 +346,10 @@ function generatePowerup(type) {
         ctx.beginPath(); ctx.arc(c*1.5, c/2, 3, 0, Math.PI*2); ctx.fill();
         ctx.beginPath(); ctx.arc(c, c*1.3, 4, 0, Math.PI*2); ctx.fill();
     } else if (type === BlockType.FEATHER) {
-        ctx.fillStyle = '#cccccc';
+        ctx.fillStyle = '#00ffff'; // Neon cyan instead of blending gray
         ctx.fillRect(0, 0, TEX_SIZE, TEX_SIZE);
         ctx.strokeStyle = '#ffffff';
-        ctx.lineWidth = 4;
+        ctx.lineWidth = 6;
         ctx.beginPath(); ctx.moveTo(4, TEX_SIZE-4); ctx.lineTo(TEX_SIZE-4, 4); ctx.stroke();
     } else if (type === BlockType.FROG) {
         ctx.fillStyle = '#22aa22';

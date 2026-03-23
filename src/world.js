@@ -254,9 +254,9 @@ export class World {
                         let eggType = BlockType.EASTER_EGG;
                         if (r < 0.002) eggType = BlockType.DIAMOND_EGG;
                         else if (r < 0.10) eggType = BlockType.GOLDEN_EGG;
-                        else if (r > 0.90) eggType = BlockType.MUSHROOM;
-                        else if (r > 0.80) eggType = BlockType.FEATHER;
-                        else if (r > 0.70) eggType = BlockType.FROG;
+                        else if (r > 0.90) eggType = BlockType.MUSHROOM; // 10%
+                        else if (r > 0.60) eggType = BlockType.FEATHER;  // 30% feather density!
+                        else if (r > 0.50) eggType = BlockType.FROG;     // 10%
                         chunk.setBlock(lx, height + 1, lz, eggType);
                     }
                 }
@@ -278,10 +278,10 @@ export class World {
                         const r = Math.random();
                         let eggType = BlockType.EASTER_EGG;
                         if (r < 0.10) eggType = BlockType.DIAMOND_EGG;
-                        else if (r < 0.50) eggType = BlockType.GOLDEN_EGG;
-                        else if (r > 0.85) eggType = BlockType.MUSHROOM;
-                        else if (r > 0.70) eggType = BlockType.FEATHER;
-                        else if (r > 0.55) eggType = BlockType.FROG;
+                        else if (r < 0.40) eggType = BlockType.GOLDEN_EGG;
+                        else if (r > 0.85) eggType = BlockType.MUSHROOM; // 15%
+                        else if (r > 0.55) eggType = BlockType.FEATHER;  // 30% feather density!
+                        else if (r > 0.40) eggType = BlockType.FROG;     // 15%
                         chunk.setBlock(lx, y, lz, eggType);
                         break;
                     }
