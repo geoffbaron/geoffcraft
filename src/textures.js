@@ -323,13 +323,44 @@ function generateLava() {
         for (let x = 0; x < TEX_SIZE; x++) {
             const idx = (y * TEX_SIZE + x) * 4;
             const heat = noise(x*2, y*2, 2024);
-            imageData.data[idx] = 255; // R
-            imageData.data[idx+1] = Math.floor(heat * 130); // G (Orange)
-            imageData.data[idx+2] = 0; // B
+            imageData.data[idx] = 255;
+            imageData.data[idx+1] = Math.floor(heat * 130);
+            imageData.data[idx+2] = 0;
             imageData.data[idx+3] = 255;
         }
     }
     ctx.putImageData(imageData, 0, 0);
+    return canvas;
+}
+
+function generatePowerup(type) {
+    const canvas = createCanvas();
+    const ctx = canvas.getContext('2d');
+    const c = TEX_SIZE / 2;
+    
+    if (type === BlockType.MUSHROOM) {
+        ctx.fillStyle = '#ff3333';
+        ctx.fillRect(0, 0, TEX_SIZE, TEX_SIZE);
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath(); ctx.arc(c/2, c/2, 3, 0, Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.arc(c*1.5, c/2, 3, 0, Math.PI*2); ctx.fill();
+        ctx.beginPath(); ctx.arc(c, c*1.3, 4, 0, Math.PI*2); ctx.fill();
+    } else if (type === BlockType.FEATHER) {
+        ctx.fillStyle = '#cccccc';
+        ctx.fillRect(0, 0, TEX_SIZE, TEX_SIZE);
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 4;
+        ctx.beginPath(); ctx.moveTo(4, TEX_SIZE-4); ctx.lineTo(TEX_SIZE-4, 4); ctx.stroke();
+    } else if (type === BlockType.FROG) {
+        ctx.fillStyle = '#22aa22';
+        ctx.fillRect(0, 0, TEX_SIZE, TEX_SIZE);
+        ctx.fillStyle = '#000000';
+        ctx.fillRect(c/2, c/2, 4, 4);
+        ctx.fillRect(c*1.5 - 4, c/2, 4, 4);
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(c/2 + 2, c/2 + 1, 2, 2);
+        ctx.fillRect(c*1.5 - 2, c/2 + 1, 2, 2);
+    }
     return canvas;
 }
 
@@ -457,6 +488,15 @@ export function createTextureAtlas() {
 
     const lavaTex = canvasToTexture(generateLava());
     faceTextures[BlockType.LAVA] = { top: lavaTex, side: lavaTex, bottom: lavaTex };
+
+    const meshTex = canvasToTexture(generatePowerup(BlockType.MUSHROOM));
+    faceTextures[BlockType.MUSHROOM] = { top: meshTex, side: meshTex, bottom: meshTex };
+
+    const featherTex = canvasToTexture(generatePowerup(BlockType.FEATHER));
+    faceTextures[BlockType.FEATHER] = { top: featherTex, side: featherTex, bottom: featherTex };
+
+    const frogTex = canvasToTexture(generatePowerup(BlockType.FROG));
+    faceTextures[BlockType.FROG] = { top: frogTex, side: frogTex, bottom: frogTex };
 
     const candyRedTex = canvasToTexture(generateSimpleTexture(BlockType.CANDY_RED));
     faceTextures[BlockType.CANDY_RED] = { top: candyRedTex, side: candyRedTex, bottom: candyRedTex };

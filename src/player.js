@@ -2,12 +2,10 @@ import * as THREE from 'three';
 import { isBlockSolid, BlockType } from './blocks.js';
 
 const GRAVITY = 25;
-const JUMP_FORCE = 16;
 const MOVE_SPEED = 5.5;
 const SPRINT_SPEED = 8.8;
 const FLY_SPEED = 15;
 const FLY_SPRINT_SPEED = 40;
-const PLAYER_HEIGHT = 1.7;
 const PLAYER_WIDTH = 0.3;
 const MOUSE_SENSITIVITY = 0.002;
 
@@ -15,6 +13,10 @@ export class Player {
     constructor(camera, world) {
         this.camera = camera;
         this.world = world;
+
+        this.height = 1.7;
+        this.jumpForce = 16;
+        this.canFly = false;
 
         this.position = new THREE.Vector3(0, 80, 0);
         this.velocity = new THREE.Vector3(0, 0, 0);
@@ -33,6 +35,14 @@ export class Player {
 
     setupControls() {
         document.addEventListener('keydown', (e) => {
+            if (e.code === 'Space' && !this.keys['Space']) {
+                const now = performance.now();
+                if (now - this.lastSpaceTap < 300 && this.canFly) {
+                    this.flying = !this.flying;
+                    if (!this.flying) this.velocity.y = 0;
+                }
+                this.lastSpaceTap = now;
+            }
             this.keys[e.code] = true;
         });
         document.addEventListener('keyup', (e) => {
@@ -104,7 +114,7 @@ export class Player {
             this.velocity.y -= GRAVITY * dt;
             // Jump
             if (this.keys['Space'] && this.onGround) {
-                this.velocity.y = JUMP_FORCE;
+                this.velocity.y = this.jumpForce;
                 this.onGround = false;
             }
             this.moveWithCollision(dt);
@@ -112,7 +122,7 @@ export class Player {
 
         // Update camera
         this.camera.position.copy(this.position);
-        this.camera.position.y += PLAYER_HEIGHT;
+        this.camera.position.y += this.height;
         const euler = new THREE.Euler(this.rotation.x, this.rotation.y, 0, 'YXZ');
         this.camera.quaternion.setFromEuler(euler);
     }
@@ -164,7 +174,7 @@ export class Player {
         for (let dx = -1; dx <= 1; dx += 2) {
             for (let dz = -1; dz <= 1; dz += 2) {
                 for (let dy = 0; dy <= 1; dy++) {
-                    const checkY = dy === 0 ? pos.y : pos.y + PLAYER_HEIGHT;
+                    const checkY = dy === 0 ? pos.y : pos.y + this.height;
                     const bx = Math.floor(pos.x + dx * w);
                     const by = Math.floor(checkY);
                     const bz = Math.floor(pos.z + dz * w);

@@ -254,6 +254,9 @@ export class World {
                         let eggType = BlockType.EASTER_EGG;
                         if (r < 0.002) eggType = BlockType.DIAMOND_EGG;
                         else if (r < 0.10) eggType = BlockType.GOLDEN_EGG;
+                        else if (r > 0.98) eggType = BlockType.MUSHROOM;
+                        else if (r > 0.96) eggType = BlockType.FEATHER;
+                        else if (r > 0.94) eggType = BlockType.FROG;
                         chunk.setBlock(lx, height + 1, lz, eggType);
                     }
                 }
@@ -274,8 +277,11 @@ export class World {
                     if (chunk.getBlock(lx, y + 1, lz) === BlockType.AIR) {
                         const r = Math.random();
                         let eggType = BlockType.EASTER_EGG;
-                        if (r < 0.10) eggType = BlockType.DIAMOND_EGG; // 10% underground vs 0.2% surface
-                        else if (r < 0.50) eggType = BlockType.GOLDEN_EGG; // 40% underground vs 10% surface
+                        if (r < 0.10) eggType = BlockType.DIAMOND_EGG;
+                        else if (r < 0.50) eggType = BlockType.GOLDEN_EGG;
+                        else if (r > 0.95) eggType = BlockType.MUSHROOM;
+                        else if (r > 0.90) eggType = BlockType.FEATHER;
+                        else if (r > 0.85) eggType = BlockType.FROG;
                         chunk.setBlock(lx, y, lz, eggType);
                         break;
                     }

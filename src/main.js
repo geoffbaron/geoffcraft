@@ -198,6 +198,28 @@ class Game {
                     this.actionCooldown = 0.2;
                     return;
                 }
+
+                if (hit.block.type === BlockType.MUSHROOM) {
+                    this.world.setBlock(hit.block.x, hit.block.y, hit.block.z, BlockType.AIR);
+                    this.player.height *= 3;
+                    this.player.camera.position.y += this.player.height * (2/3); 
+                    this.actionCooldown = 0.2;
+                    return;
+                }
+
+                if (hit.block.type === BlockType.FEATHER) {
+                    this.world.setBlock(hit.block.x, hit.block.y, hit.block.z, BlockType.AIR);
+                    this.player.canFly = true;
+                    this.actionCooldown = 0.2;
+                    return;
+                }
+
+                if (hit.block.type === BlockType.FROG) {
+                    this.world.setBlock(hit.block.x, hit.block.y, hit.block.z, BlockType.AIR);
+                    this.player.jumpForce *= 3;
+                    this.actionCooldown = 0.2;
+                    return;
+                }
                 
                 // Allow generic digging for terrain!
                 this.world.setBlock(hit.block.x, hit.block.y, hit.block.z, BlockType.AIR);

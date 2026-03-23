@@ -27,6 +27,9 @@ export const BlockType = {
     CANDY_BLUE: 24,
     DIAMOND_EGG: 25,
     LAVA: 26,
+    MUSHROOM: 27,
+    FEATHER: 28,
+    FROG: 29,
 };
 
 // Block properties
@@ -58,6 +61,9 @@ export const BlockData = {
     [BlockType.CANDY_BLUE]:  { name: 'Candy Blue',  solid: true,  transparent: false },
     [BlockType.DIAMOND_EGG]: { name: 'Diamond Egg', solid: false, transparent: true  },
     [BlockType.LAVA]:        { name: 'Lava',        solid: false, transparent: true  },
+    [BlockType.MUSHROOM]:    { name: 'Mushroom',    solid: false, transparent: true  },
+    [BlockType.FEATHER]:     { name: 'Feather',     solid: false, transparent: true  },
+    [BlockType.FROG]:        { name: 'Frog',        solid: false, transparent: true  },
 };
 
 // Color definitions for each block face [top, bottom, side] as RGB arrays
@@ -87,6 +93,9 @@ export const BlockColors = {
     [BlockType.CANDY_BLUE]:  { top: [0.2, 0.4, 0.9], bottom: [0.2, 0.4, 0.9], side: [0.15, 0.35, 0.85] },
     [BlockType.DIAMOND_EGG]: { top: [0.4, 0.9, 1.0], bottom: [0.4, 0.9, 1.0], side: [0.4, 0.9, 1.0] },
     [BlockType.LAVA]:        { top: [0.9, 0.3, 0.0], bottom: [0.9, 0.3, 0.0], side: [0.9, 0.3, 0.0] },
+    [BlockType.MUSHROOM]:    { top: [0.9, 0.1, 0.1], bottom: [0.9, 0.1, 0.1], side: [0.9, 0.1, 0.1] },
+    [BlockType.FEATHER]:     { top: [0.95, 0.95, 0.95], bottom: [0.95, 0.95, 0.95], side: [0.95, 0.95, 0.95] },
+    [BlockType.FROG]:        { top: [0.2, 0.8, 0.2], bottom: [0.2, 0.8, 0.2], side: [0.2, 0.8, 0.2] },
 };
 
 export function isBlockSolid(type) {
