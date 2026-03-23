@@ -5,12 +5,15 @@ import { UI } from './ui.js';
 import { BlockType } from './blocks.js';
 import { createTextureAtlas } from './textures.js';
 import { Bunny } from './bunny.js';
+import { AudioManager } from './audio.js';
 
 class Game {
     constructor() {
         this.canvas = document.getElementById('game-canvas');
         this.menuScreen = document.getElementById('menu-screen');
         this.started = false;
+
+        this.audio = new AudioManager();
 
         // Renderer
         this.renderer = new THREE.WebGLRenderer({ canvas: this.canvas, antialias: false });
@@ -97,7 +100,7 @@ class Game {
         this.activeTorches  = [];          // flat [x,y,z, ...] of active torch flame positions
 
         // Player
-        this.player = new Player(this.camera, this.world);
+        this.player = new Player(this.camera, this.world, this.audio);
         this.player.findSpawnPosition();
 
         // Spawn Giant Hopping Bunnies
@@ -153,6 +156,7 @@ class Game {
     setupEvents() {
         // Click to start
         this.menuScreen.addEventListener('click', () => {
+            this.audio.init();
             this.start();
         });
 
@@ -190,10 +194,12 @@ class Game {
                 // Award Egg Collectible logic if an Egg was struck!
                 if (hit.block.type === BlockType.EASTER_EGG || hit.block.type === BlockType.GOLDEN_EGG || hit.block.type === BlockType.DIAMOND_EGG) {
                     this.world.setBlock(hit.block.x, hit.block.y, hit.block.z, BlockType.AIR);
-                    if (hit.block.type === BlockType.EASTER_EGG) this.eggsFound += 1;
-                    else if (hit.block.type === BlockType.GOLDEN_EGG) this.eggsFound += 10;
-                    else if (hit.block.type === BlockType.DIAMOND_EGG) this.eggsFound += 30;
+                    let points = 1;
+                    if (hit.block.type === BlockType.EASTER_EGG) { this.eggsFound += 1; }
+                    else if (hit.block.type === BlockType.GOLDEN_EGG) { this.eggsFound += 10; points = 10; }
+                    else if (hit.block.type === BlockType.DIAMOND_EGG) { this.eggsFound += 30; points = 30; }
                     
+                    this.audio.playEggCollect(points);
                     this.ui.updateHunterHUD(Math.ceil(this.timeLeft), this.eggsFound);
                     this.actionCooldown = 0.2;
                     return;
@@ -203,6 +209,7 @@ class Game {
                     this.world.setBlock(hit.block.x, hit.block.y, hit.block.z, BlockType.AIR);
                     this.player.height *= 3;
                     this.player.camera.position.y += this.player.height * (2/3); 
+                    this.audio.playPowerup();
                     this.actionCooldown = 0.2;
                     return;
                 }
@@ -210,6 +217,7 @@ class Game {
                 if (hit.block.type === BlockType.FEATHER) {
                     this.world.setBlock(hit.block.x, hit.block.y, hit.block.z, BlockType.AIR);
                     this.player.canFly = true;
+                    this.audio.playPowerup();
                     this.actionCooldown = 0.2;
                     return;
                 }
@@ -217,6 +225,7 @@ class Game {
                 if (hit.block.type === BlockType.FROG) {
                     this.world.setBlock(hit.block.x, hit.block.y, hit.block.z, BlockType.AIR);
                     this.player.jumpForce *= 3;
+                    this.audio.playPowerup();
                     this.actionCooldown = 0.2;
                     return;
                 }
@@ -225,6 +234,7 @@ class Game {
                     this.world.setBlock(hit.block.x, hit.block.y, hit.block.z, BlockType.AIR);
                     this.player.moveSpeed *= 3;
                     this.player.sprintSpeed *= 3;
+                    this.audio.playPowerup();
                     this.actionCooldown = 0.2;
                     return;
                 }
@@ -232,14 +242,17 @@ class Game {
                 if (hit.block.type === BlockType.DYNAMITE) {
                     this.world.setBlock(hit.block.x, hit.block.y, hit.block.z, BlockType.AIR);
                     this.player.hasDynamite = true;
+                    this.audio.playPowerup();
                     this.actionCooldown = 0.2;
                     return;
                 }
                 
                 // If mining an generic terrain block
                 if (this.player.hasDynamite) {
+                    this.audio.playExplosion();
                     this.world.createExplosion(hit.block.x, hit.block.y, hit.block.z, 4);
                 } else {
+                    this.audio.playDig();
                     this.world.setBlock(hit.block.x, hit.block.y, hit.block.z, BlockType.AIR);
                 }
                 this.actionCooldown = 0.2;

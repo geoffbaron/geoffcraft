@@ -8,9 +8,10 @@ const PLAYER_WIDTH = 0.3;
 const MOUSE_SENSITIVITY = 0.002;
 
 export class Player {
-    constructor(camera, world) {
+    constructor(camera, world, audio) {
         this.camera = camera;
         this.world = world;
+        this.audio = audio;
 
         this.height = 1.7;
         this.jumpForce = 16;
@@ -27,6 +28,7 @@ export class Player {
         this.sprinting = false;
         this.flying = false;
         this.lastSpaceTap = 0;
+        this.stepDistance = 0;
 
         this.keys = {};
         this.mouseLocked = false;
@@ -117,8 +119,20 @@ export class Player {
             if (this.keys['Space'] && this.onGround) {
                 this.velocity.y = this.jumpForce;
                 this.onGround = false;
+                if (this.audio) this.audio.playJump();
             }
             this.moveWithCollision(dt);
+
+            if (this.onGround && moveDir.length() > 0) {
+                this.stepDistance += speed * dt;
+                const threshold = this.sprinting ? 2.5 : 2.0;
+                if (this.stepDistance > threshold) {
+                    if (this.audio) this.audio.playStep();
+                    this.stepDistance = 0;
+                }
+            } else if (!this.onGround) {
+                this.stepDistance = 0;
+            }
         }
 
         // Update camera
