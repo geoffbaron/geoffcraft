@@ -152,11 +152,19 @@ export class UI {
                 try {
                     const res = await fetch('/score', {
                         method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ name, score: eggs })
                     });
+                    
+                    if (!res.ok) {
+                        const errData = await res.json().catch(() => ({}));
+                        throw new Error(errData.error || `Server responded with status ${res.status}`);
+                    }
+                    
                     const leaderboard = await res.json();
                     this.renderLeaderboard(leaderboard);
                 } catch (err) {
+                    console.error("Frontend Submit Error:", err);
                     submitBtn.textContent = 'Error saving';
                 }
             };

@@ -2,8 +2,15 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 
-const PORT = 3000;
-const LEADERBOARD_FILE = path.join(__dirname, 'leaderboard.json');
+const PORT = process.env.PORT || 3000;
+const DATA_DIR = process.env.DATA_DIR || __dirname;
+
+if (!fs.existsSync(DATA_DIR)) {
+    try { fs.mkdirSync(DATA_DIR, { recursive: true }); } 
+    catch (e) { console.error("Could not create DATA_DIR", e); }
+}
+
+const LEADERBOARD_FILE = path.join(DATA_DIR, 'leaderboard.json');
 
 const MIME_TYPES = {
     '.html': 'text/html',
@@ -14,20 +21,40 @@ const MIME_TYPES = {
 };
 
 if (!fs.existsSync(LEADERBOARD_FILE)) {
-    fs.writeFileSync(LEADERBOARD_FILE, JSON.stringify([]));
+    try { fs.writeFileSync(LEADERBOARD_FILE, JSON.stringify([])); } 
+    catch (e) { console.error("Init write failed. Read-only filesystem?", e); }
 }
 
 const server = http.createServer((req, res) => {
+    // Railway Cloud proxy protections
+    const reqPath = req.url.split('?')[0].replace(/\/$/, "");
+
+    if (req.method === 'OPTIONS') {
+        res.writeHead(204, {
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+            'Access-Control-Allow-Headers': 'Content-Type'
+        });
+        res.end();
+        return;
+    }
+
     // API: Get Leaderboard
-    if (req.method === 'GET' && req.url === '/leaderboard') {
-        const data = fs.readFileSync(LEADERBOARD_FILE, 'utf-8');
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(data);
+    if (req.method === 'GET' && reqPath === '/leaderboard') {
+        try {
+            const data = fs.readFileSync(LEADERBOARD_FILE, 'utf-8');
+            res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+            res.end(data);
+        } catch (e) {
+            console.error(e);
+            res.writeHead(500, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+            res.end("[]");
+        }
         return;
     }
 
     // API: Submit Score
-    if (req.method === 'POST' && req.url === '/score') {
+    if (req.method === 'POST' && reqPath === '/score') {
         let body = '';
         req.on('data', chunk => body += chunk.toString());
         req.on('end', () => {
@@ -43,18 +70,18 @@ const server = http.createServer((req, res) => {
                 
                 fs.writeFileSync(LEADERBOARD_FILE, JSON.stringify(scores));
                 
-                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
                 res.end(JSON.stringify(scores));
             } catch (e) {
-                res.writeHead(400);
-                res.end(JSON.stringify({ error: 'Invalid request' }));
+                console.error("Score Save Error:", e);
+                res.writeHead(400, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+                res.end(JSON.stringify({ error: e.toString() }));
             }
         });
         return;
     }
 
     // Static Asset Serving
-    let reqPath = req.url.split('?')[0];
     let filePath = reqPath === '/' ? '/index.html' : reqPath;
     filePath = path.join(__dirname, filePath);
     
