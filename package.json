@@ -1,0 +1,11 @@
+{
+  "name": "eastercraft",
+  "version": "1.0.0",
+  "description": "EasterCraft Voxel Engine",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "author": "Geoff Baron",
+  "license": "ISC"
+}
