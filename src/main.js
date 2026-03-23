@@ -198,6 +198,10 @@ class Game {
                     this.actionCooldown = 0.2;
                     return;
                 }
+                
+                // Allow generic digging for terrain!
+                this.world.setBlock(hit.block.x, hit.block.y, hit.block.z, BlockType.AIR);
+                this.actionCooldown = 0.2;
             }
         });
 
