@@ -371,6 +371,22 @@ function generatePowerup(type) {
         ctx.fillRect(8, 6, 4, 2);
         ctx.fillStyle = '#000000';
         ctx.fillRect(4, 14, 8, 2);
+    } else if (type === BlockType.DYNAMITE) {
+        // Red dynamite sticks
+        ctx.fillStyle = '#cc0000';
+        ctx.fillRect(2, 2, 4, 12);
+        ctx.fillRect(6, 2, 4, 12);
+        ctx.fillRect(10, 2, 4, 12);
+        // White tape band
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(2, 7, 12, 2);
+        // Fuse
+        ctx.fillStyle = '#333333';
+        ctx.fillRect(7, 0, 2, 2);
+        // Spark
+        ctx.fillStyle = '#ffaa00';
+        ctx.fillRect(6, 0, 1, 1);
+        ctx.fillRect(9, 0, 1, 1);
     }
     return canvas;
 }
@@ -511,6 +527,9 @@ export function createTextureAtlas() {
 
     const shoeTex = canvasToTexture(generatePowerup(BlockType.SHOE));
     faceTextures[BlockType.SHOE] = { top: shoeTex, side: shoeTex, bottom: shoeTex };
+
+    const dynTex = canvasToTexture(generatePowerup(BlockType.DYNAMITE));
+    faceTextures[BlockType.DYNAMITE] = { top: dynTex, side: dynTex, bottom: dynTex };
 
     const candyRedTex = canvasToTexture(generateSimpleTexture(BlockType.CANDY_RED));
     faceTextures[BlockType.CANDY_RED] = { top: candyRedTex, side: candyRedTex, bottom: candyRedTex };

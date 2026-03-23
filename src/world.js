@@ -108,6 +108,26 @@ export class World {
         return value / max; // measured range: [0.44, 0.99], avg ~0.80
     }
 
+    createExplosion(cx, cy, cz, radius) {
+        for (let dx = -radius; dx <= radius; dx++) {
+            for (let dy = -radius; dy <= radius; dy++) {
+                for (let dz = -radius; dz <= radius; dz++) {
+                    if (dx*dx + dy*dy + dz*dz <= radius*radius) {
+                        const bx = cx + dx;
+                        const by = cy + dy;
+                        const bz = cz + dz;
+                        if (by >= 0 && by < CHUNK_HEIGHT) {
+                            const block = this.getBlock(bx, by, bz);
+                            if (block !== BlockType.AIR && block !== BlockType.BEDROCK) {
+                                this.setBlock(bx, by, bz, BlockType.AIR);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     getHeight(wx, wz) {
         // Base rolling plains / hills
         const base = this.noise.fbm(wx * 0.005, wz * 0.005, 4) * 0.5 + 0.5;
@@ -254,10 +274,11 @@ export class World {
                         let eggType = BlockType.EASTER_EGG;
                         if (r < 0.002) eggType = BlockType.DIAMOND_EGG;
                         else if (r < 0.10) eggType = BlockType.GOLDEN_EGG;
-                        else if (r > 0.85) eggType = BlockType.MUSHROOM; // 15%
-                        else if (r > 0.70) eggType = BlockType.FEATHER;  // 15%
-                        else if (r > 0.55) eggType = BlockType.FROG;     // 15%
-                        else if (r > 0.40) eggType = BlockType.SHOE;     // 15%
+                        else if (r > 0.88) eggType = BlockType.MUSHROOM; // 12%
+                        else if (r > 0.76) eggType = BlockType.FEATHER;  // 12%
+                        else if (r > 0.64) eggType = BlockType.FROG;     // 12%
+                        else if (r > 0.52) eggType = BlockType.SHOE;     // 12%
+                        else if (r > 0.40) eggType = BlockType.DYNAMITE; // 12%
                         chunk.setBlock(lx, height + 1, lz, eggType);
                     }
                 }
@@ -280,10 +301,11 @@ export class World {
                         let eggType = BlockType.EASTER_EGG;
                         if (r < 0.10) eggType = BlockType.DIAMOND_EGG;
                         else if (r < 0.40) eggType = BlockType.GOLDEN_EGG;
-                        else if (r > 0.80) eggType = BlockType.MUSHROOM; // 20%
-                        else if (r > 0.60) eggType = BlockType.FEATHER;  // 20%
-                        else if (r > 0.40) eggType = BlockType.FROG;     // 20%
-                        else if (r > 0.20) eggType = BlockType.SHOE;     // 20%
+                        else if (r > 0.84) eggType = BlockType.MUSHROOM; // 16%
+                        else if (r > 0.68) eggType = BlockType.FEATHER;  // 16%
+                        else if (r > 0.52) eggType = BlockType.FROG;     // 16%
+                        else if (r > 0.36) eggType = BlockType.SHOE;     // 16%
+                        else if (r > 0.20) eggType = BlockType.DYNAMITE; // 16%
                         chunk.setBlock(lx, y, lz, eggType);
                         break;
                     }

@@ -228,9 +228,20 @@ class Game {
                     this.actionCooldown = 0.2;
                     return;
                 }
+
+                if (hit.block.type === BlockType.DYNAMITE) {
+                    this.world.setBlock(hit.block.x, hit.block.y, hit.block.z, BlockType.AIR);
+                    this.player.hasDynamite = true;
+                    this.actionCooldown = 0.2;
+                    return;
+                }
                 
-                // Allow generic digging for terrain!
-                this.world.setBlock(hit.block.x, hit.block.y, hit.block.z, BlockType.AIR);
+                // If mining an generic terrain block
+                if (this.player.hasDynamite) {
+                    this.world.createExplosion(hit.block.x, hit.block.y, hit.block.z, 4);
+                } else {
+                    this.world.setBlock(hit.block.x, hit.block.y, hit.block.z, BlockType.AIR);
+                }
                 this.actionCooldown = 0.2;
             }
         });

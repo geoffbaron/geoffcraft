@@ -17,6 +17,7 @@ export class Player {
         this.canFly = false;
         this.moveSpeed = 5.5;
         this.sprintSpeed = 8.8;
+        this.hasDynamite = false;
 
         this.position = new THREE.Vector3(0, 80, 0);
         this.velocity = new THREE.Vector3(0, 0, 0);
