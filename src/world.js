@@ -238,7 +238,7 @@ export class World {
 
         // Generate Easter Eggs
         const rand = new Noise(cx * 99 + cz * 33);
-        const numEggs = 2 + Math.floor(Math.abs(rand.noise2D(cx * 1.5, cz * 1.5)) * 4);
+        const numEggs = 4 + Math.floor(Math.abs(rand.noise2D(cx * 1.5, cz * 1.5)) * 8);
         for (let i = 0; i < numEggs; i++) {
             const lx = Math.floor(Math.abs(rand.noise2D(i, cx)) * (CHUNK_SIZE - 2)) + 1;
             const lz = Math.floor(Math.abs(rand.noise2D(cz, i)) * (CHUNK_SIZE - 2)) + 1;
@@ -254,9 +254,9 @@ export class World {
                         let eggType = BlockType.EASTER_EGG;
                         if (r < 0.002) eggType = BlockType.DIAMOND_EGG;
                         else if (r < 0.10) eggType = BlockType.GOLDEN_EGG;
-                        else if (r > 0.98) eggType = BlockType.MUSHROOM;
-                        else if (r > 0.96) eggType = BlockType.FEATHER;
-                        else if (r > 0.94) eggType = BlockType.FROG;
+                        else if (r > 0.90) eggType = BlockType.MUSHROOM;
+                        else if (r > 0.80) eggType = BlockType.FEATHER;
+                        else if (r > 0.70) eggType = BlockType.FROG;
                         chunk.setBlock(lx, height + 1, lz, eggType);
                     }
                 }
@@ -264,7 +264,7 @@ export class World {
         }
 
         // Generate Cave Easter Eggs
-        const numCaveEggs = 1 + Math.floor(Math.abs(rand.noise2D(cx * 2.1, cz * 2.1)) * 3);
+        const numCaveEggs = 3 + Math.floor(Math.abs(rand.noise2D(cx * 2.1, cz * 2.1)) * 6);
         for (let i = 0; i < numCaveEggs; i++) {
             const lx = Math.floor(Math.abs(rand.noise2D(i + 10, cx)) * (CHUNK_SIZE - 2)) + 1;
             const lz = Math.floor(Math.abs(rand.noise2D(cz, i + 10)) * (CHUNK_SIZE - 2)) + 1;
@@ -279,9 +279,9 @@ export class World {
                         let eggType = BlockType.EASTER_EGG;
                         if (r < 0.10) eggType = BlockType.DIAMOND_EGG;
                         else if (r < 0.50) eggType = BlockType.GOLDEN_EGG;
-                        else if (r > 0.95) eggType = BlockType.MUSHROOM;
-                        else if (r > 0.90) eggType = BlockType.FEATHER;
-                        else if (r > 0.85) eggType = BlockType.FROG;
+                        else if (r > 0.85) eggType = BlockType.MUSHROOM;
+                        else if (r > 0.70) eggType = BlockType.FEATHER;
+                        else if (r > 0.55) eggType = BlockType.FROG;
                         chunk.setBlock(lx, y, lz, eggType);
                         break;
                     }
