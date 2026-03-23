@@ -220,6 +220,14 @@ class Game {
                     this.actionCooldown = 0.2;
                     return;
                 }
+
+                if (hit.block.type === BlockType.SHOE) {
+                    this.world.setBlock(hit.block.x, hit.block.y, hit.block.z, BlockType.AIR);
+                    this.player.moveSpeed *= 3;
+                    this.player.sprintSpeed *= 3;
+                    this.actionCooldown = 0.2;
+                    return;
+                }
                 
                 // Allow generic digging for terrain!
                 this.world.setBlock(hit.block.x, hit.block.y, hit.block.z, BlockType.AIR);

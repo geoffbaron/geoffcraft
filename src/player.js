@@ -2,8 +2,6 @@ import * as THREE from 'three';
 import { isBlockSolid, BlockType } from './blocks.js';
 
 const GRAVITY = 25;
-const MOVE_SPEED = 5.5;
-const SPRINT_SPEED = 8.8;
 const FLY_SPEED = 15;
 const FLY_SPRINT_SPEED = 40;
 const PLAYER_WIDTH = 0.3;
@@ -17,6 +15,8 @@ export class Player {
         this.height = 1.7;
         this.jumpForce = 16;
         this.canFly = false;
+        this.moveSpeed = 5.5;
+        this.sprintSpeed = 8.8;
 
         this.position = new THREE.Vector3(0, 80, 0);
         this.velocity = new THREE.Vector3(0, 0, 0);
@@ -106,7 +106,7 @@ export class Player {
             // No collision in fly mode — move freely
             this.position.addScaledVector(this.velocity, dt);
         } else {
-            const speed = this.sprinting ? SPRINT_SPEED : MOVE_SPEED;
+            const speed = this.sprinting ? this.sprintSpeed : this.moveSpeed;
             if (moveDir.length() > 0) moveDir.normalize().multiplyScalar(speed);
             this.velocity.x = moveDir.x;
             this.velocity.z = moveDir.z;

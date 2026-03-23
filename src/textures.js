@@ -360,6 +360,14 @@ function generatePowerup(type) {
         ctx.fillStyle = '#ffffff';
         ctx.fillRect(c/2 + 2, c/2 + 1, 2, 2);
         ctx.fillRect(c*1.5 - 2, c/2 + 1, 2, 2);
+    } else if (type === BlockType.SHOE) {
+        ctx.fillStyle = '#ff2222';
+        ctx.fillRect(0, 0, TEX_SIZE, TEX_SIZE);
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(4, 8, 8, 6);
+        ctx.fillRect(8, 6, 4, 2);
+        ctx.fillStyle = '#000000';
+        ctx.fillRect(4, 14, 8, 2);
     }
     return canvas;
 }
@@ -497,6 +505,9 @@ export function createTextureAtlas() {
 
     const frogTex = canvasToTexture(generatePowerup(BlockType.FROG));
     faceTextures[BlockType.FROG] = { top: frogTex, side: frogTex, bottom: frogTex };
+
+    const shoeTex = canvasToTexture(generatePowerup(BlockType.SHOE));
+    faceTextures[BlockType.SHOE] = { top: shoeTex, side: shoeTex, bottom: shoeTex };
 
     const candyRedTex = canvasToTexture(generateSimpleTexture(BlockType.CANDY_RED));
     faceTextures[BlockType.CANDY_RED] = { top: candyRedTex, side: candyRedTex, bottom: candyRedTex };

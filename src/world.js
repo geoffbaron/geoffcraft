@@ -257,6 +257,7 @@ export class World {
                         else if (r > 0.90) eggType = BlockType.MUSHROOM; // 10%
                         else if (r > 0.80) eggType = BlockType.FEATHER;  // 10%
                         else if (r > 0.70) eggType = BlockType.FROG;     // 10%
+                        else if (r > 0.60) eggType = BlockType.SHOE;     // 10%
                         chunk.setBlock(lx, height + 1, lz, eggType);
                     }
                 }
@@ -282,6 +283,7 @@ export class World {
                         else if (r > 0.85) eggType = BlockType.MUSHROOM; // 15%
                         else if (r > 0.70) eggType = BlockType.FEATHER;  // 15%
                         else if (r > 0.55) eggType = BlockType.FROG;     // 15%
+                        else if (r > 0.40) eggType = BlockType.SHOE;     // 15%
                         chunk.setBlock(lx, y, lz, eggType);
                         break;
                     }
