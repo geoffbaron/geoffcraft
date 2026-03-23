@@ -198,31 +198,6 @@ class Game {
                     this.actionCooldown = 0.2;
                     return;
                 }
-                
-                this.world.setBlock(hit.block.x, hit.block.y, hit.block.z, BlockType.AIR);
-                this.actionCooldown = 0.2;
-            } else if (e.button === 2) {
-                // Right click - place
-                const px = hit.block.x + hit.normal.x;
-                const py = hit.block.y + hit.normal.y;
-                const pz = hit.block.z + hit.normal.z;
-
-                // Don't place inside the player
-                const playerMinX = this.player.position.x - 0.3;
-                const playerMaxX = this.player.position.x + 0.3;
-                const playerMinZ = this.player.position.z - 0.3;
-                const playerMaxZ = this.player.position.z + 0.3;
-                const playerMinY = this.player.position.y;
-                const playerMaxY = this.player.position.y + 1.7;
-
-                if (px + 1 > playerMinX && px < playerMaxX &&
-                    py + 1 > playerMinY && py < playerMaxY &&
-                    pz + 1 > playerMinZ && pz < playerMaxZ) {
-                    return;
-                }
-
-                this.world.setBlock(px, py, pz, this.ui.getSelectedBlock());
-                this.actionCooldown = 0.2;
             }
         });
 
