@@ -503,29 +503,34 @@ export function createTextureAtlas() {
 
     const candyWhiteTex = canvasToTexture(generateSimpleTexture(BlockType.CANDY_WHITE));
     faceTextures[BlockType.CANDY_WHITE] = { top: candyWhiteTex, side: candyWhiteTex, bottom: candyWhiteTex };
-    
-    // Candy Blue has a white swirl!
-    const candyBlueCanvas = createCanvas();
-    const cbCtx = candyBlueCanvas.getContext('2d');
-    const cbData = cbCtx.createImageData(TEX_SIZE, TEX_SIZE);
-    const cbc = BlockColors[BlockType.CANDY_BLUE].top;
-    for (let y = 0; y < TEX_SIZE; y++) {
-        for (let x = 0; x < TEX_SIZE; x++) {
-            const idx = (y * TEX_SIZE + x) * 4;
-            const dist = Math.sqrt((x - 8) ** 2 + (y - 8) ** 2);
-            const angle = Math.atan2(y - 8, x - 8);
-            const swirl = (dist * 0.8 + angle * 2) % (Math.PI * 2) > Math.PI;
-            if (swirl) {
-                cbData.data[idx] = 255; cbData.data[idx+1] = 255; cbData.data[idx+2] = 255;
-            } else {
-                cbData.data[idx] = cbc[0]*255; cbData.data[idx+1] = cbc[1]*255; cbData.data[idx+2] = cbc[2]*255;
+    function buildCandySwirl(type) {
+        const cCanvas = createCanvas();
+        const cCtx = cCanvas.getContext('2d');
+        const cData = cCtx.createImageData(TEX_SIZE, TEX_SIZE);
+        const cbc = BlockColors[type].top;
+        for (let y = 0; y < TEX_SIZE; y++) {
+            for (let x = 0; x < TEX_SIZE; x++) {
+                const idx = (y * TEX_SIZE + x) * 4;
+                const dist = Math.sqrt((x - 8) ** 2 + (y - 8) ** 2);
+                const angle = Math.atan2(y - 8, x - 8);
+                const swirl = (dist * 0.8 + angle * 2) % (Math.PI * 2) > Math.PI;
+                if (swirl) {
+                    cData.data[idx] = 255; cData.data[idx+1] = 255; cData.data[idx+2] = 255;
+                } else {
+                    cData.data[idx] = cbc[0]*255; cData.data[idx+1] = cbc[1]*255; cData.data[idx+2] = cbc[2]*255;
+                }
+                cData.data[idx+3] = 255;
             }
-            cbData.data[idx+3] = 255;
         }
+        cCtx.putImageData(cData, 0, 0);
+        return canvasToTexture(cCanvas);
     }
-    cbCtx.putImageData(cbData, 0, 0);
-    const candyBlueTex = canvasToTexture(candyBlueCanvas);
-    faceTextures[BlockType.CANDY_BLUE] = { top: candyBlueTex, side: candyBlueTex, bottom: candyBlueTex };
+    
+    const types = [BlockType.CANDY_RED, BlockType.CANDY_BLUE, BlockType.CANDY_GREEN, BlockType.CANDY_YELLOW, BlockType.CANDY_PURPLE, BlockType.CANDY_ORANGE];
+    for (const t of types) {
+        const tex = buildCandySwirl(t);
+        faceTextures[t] = { top: tex, side: tex, bottom: tex };
+    }
 
     return faceTextures;
 }

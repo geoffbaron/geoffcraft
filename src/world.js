@@ -505,7 +505,8 @@ export class World {
             for (let y = 0; y < stickHeight; y++) {
                 chunk.setBlock(x, baseY + y, z, BlockType.CANDY_WHITE);
             }
-            const headColor = Math.random() < 0.5 ? BlockType.CANDY_BLUE : BlockType.CANDY_RED;
+            const candyTypes = [BlockType.CANDY_RED, BlockType.CANDY_BLUE, BlockType.CANDY_GREEN, BlockType.CANDY_YELLOW, BlockType.CANDY_PURPLE, BlockType.CANDY_ORANGE];
+            const headColor = candyTypes[Math.floor(Math.random() * candyTypes.length)];
             const r = 2;
             const headStartY = baseY + stickHeight;
             for (let dy = -r; dy <= r; dy++) {
@@ -518,27 +519,29 @@ export class World {
                 }
             }
         } else {
-            // Giant Candy Cane
-            const height = 6 + Math.floor(Math.random() * 4);
-            for (let y = 0; y < height; y++) {
-                const color = (y % 2 === 0) ? BlockType.CANDY_RED : BlockType.CANDY_WHITE;
-                chunk.setBlock(x, baseY + y, z, color);
-            }
-            const archY = baseY + height;
-            const isX = Math.random() < 0.5;
-            const dir = Math.random() < 0.5 ? 1 : -1;
+            // Giant Gumdrop
+            const candyTypes = [BlockType.CANDY_RED, BlockType.CANDY_BLUE, BlockType.CANDY_GREEN, BlockType.CANDY_YELLOW, BlockType.CANDY_PURPLE, BlockType.CANDY_ORANGE];
+            const color = candyTypes[Math.floor(Math.random() * candyTypes.length)];
             
-            // Just place the arch blocks cleanly within bounds
-            const offsets = [[1, 0], [2, 0], [2, -1], [2, -2]];
-            let currentColor = (height % 2 === 0) ? BlockType.CANDY_RED : BlockType.CANDY_WHITE;
+            const levels = [
+                { r: 2, y: 0 },
+                { r: 2, y: 1 },
+                { r: 1, y: 2 },
+                { r: 0, y: 3 },
+            ];
             
-            for (const [o, dy] of offsets) {
-                const dx = isX ? dir * o : 0;
-                const dz = !isX ? dir * o : 0;
-                if (x + dx >= 0 && x + dx < CHUNK_SIZE && z + dz >= 0 && z + dz < CHUNK_SIZE) {
-                    chunk.setBlock(x + dx, archY + dy, z + dz, currentColor);
+            for (const lvl of levels) {
+                for (let dx = -lvl.r; dx <= lvl.r; dx++) {
+                    for (let dz = -lvl.r; dz <= lvl.r; dz++) {
+                        if (Math.abs(dx) === lvl.r && Math.abs(dz) === lvl.r && lvl.r > 0) continue;
+                        
+                        const bx = x + dx;
+                        const bz = z + dz;
+                        if (bx >= 0 && bx < CHUNK_SIZE && bz >= 0 && bz < CHUNK_SIZE) {
+                            chunk.setBlock(bx, baseY + lvl.y, bz, color);
+                        }
+                    }
                 }
-                currentColor = (currentColor === BlockType.CANDY_RED) ? BlockType.CANDY_WHITE : BlockType.CANDY_RED;
             }
         }
     }
