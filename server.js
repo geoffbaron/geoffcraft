@@ -27,7 +27,8 @@ if (!fs.existsSync(LEADERBOARD_FILE)) {
 
 const server = http.createServer((req, res) => {
     // Railway Cloud proxy protections
-    const reqPath = req.url.split('?')[0].replace(/\/$/, "");
+    let reqPath = req.url.split('?')[0];
+    if (reqPath !== '/') reqPath = reqPath.replace(/\/$/, "");
 
     if (req.method === 'OPTIONS') {
         res.writeHead(204, {
