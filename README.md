@@ -1,4 +1,4 @@
-# GeoffCraft
+# EasterCraft
 
 A browser-based Minecraft clone built with a custom voxel engine and Three.js.
 

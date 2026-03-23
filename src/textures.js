@@ -253,6 +253,86 @@ function generateGlass() {
     return canvas;
 }
 
+function generateEasterEgg() {
+    const canvas = createCanvas();
+    const ctx = canvas.getContext('2d');
+    const c = BlockColors[BlockType.EASTER_EGG].side;
+    const imageData = ctx.createImageData(TEX_SIZE, TEX_SIZE);
+    for (let y = 0; y < TEX_SIZE; y++) {
+        for (let x = 0; x < TEX_SIZE; x++) {
+            const dot = Math.sin(x * 1.5) * Math.sin(y * 1.5) > 0.4;
+            const idx = (y * TEX_SIZE + x) * 4;
+            if (dot) {
+                imageData.data[idx] = 255;
+                imageData.data[idx+1] = 220;
+                imageData.data[idx+2] = 100;
+            } else {
+                imageData.data[idx] = c[0] * 255;
+                imageData.data[idx+1] = c[1] * 255;
+                imageData.data[idx+2] = c[2] * 255;
+            }
+            imageData.data[idx+3] = 255;
+        }
+    }
+    ctx.putImageData(imageData, 0, 0);
+    return canvas;
+}
+
+function generateGoldenEgg() {
+    const canvas = createCanvas();
+    const ctx = canvas.getContext('2d');
+    const imageData = ctx.createImageData(TEX_SIZE, TEX_SIZE);
+    for (let y = 0; y < TEX_SIZE; y++) {
+        for (let x = 0; x < TEX_SIZE; x++) {
+            const idx = (y * TEX_SIZE + x) * 4;
+            const streak = Math.sin(x * 5 + y * 5) > 0.8 ? 255 : 200; // shiny streak
+            imageData.data[idx] = 255;
+            imageData.data[idx+1] = streak;
+            imageData.data[idx+2] = 0;
+            imageData.data[idx+3] = 255;
+        }
+    }
+    ctx.putImageData(imageData, 0, 0);
+    return canvas;
+}
+
+function generateDiamondEgg() {
+    const canvas = createCanvas();
+    const ctx = canvas.getContext('2d');
+    const imageData = ctx.createImageData(TEX_SIZE, TEX_SIZE);
+    for (let y = 0; y < TEX_SIZE; y++) {
+        for (let x = 0; x < TEX_SIZE; x++) {
+            const idx = (y * TEX_SIZE + x) * 4;
+            const streak = Math.sin(x * 8 - y * 3) > 0.85 ? 255 : 200;
+            const isSparkle = noise(x*4, y*4, 99) > 0.9;
+            imageData.data[idx] = isSparkle ? 255 : 50;
+            imageData.data[idx+1] = isSparkle ? 255 : Math.floor(streak * 0.8);
+            imageData.data[idx+2] = isSparkle ? 255 : streak;
+            imageData.data[idx+3] = 255;
+        }
+    }
+    ctx.putImageData(imageData, 0, 0);
+    return canvas;
+}
+
+function generateLava() {
+    const canvas = createCanvas();
+    const ctx = canvas.getContext('2d');
+    const imageData = ctx.createImageData(TEX_SIZE, TEX_SIZE);
+    for (let y = 0; y < TEX_SIZE; y++) {
+        for (let x = 0; x < TEX_SIZE; x++) {
+            const idx = (y * TEX_SIZE + x) * 4;
+            const heat = noise(x*2, y*2, 2024);
+            imageData.data[idx] = 255; // R
+            imageData.data[idx+1] = Math.floor(heat * 130); // G (Orange)
+            imageData.data[idx+2] = 0; // B
+            imageData.data[idx+3] = 255;
+        }
+    }
+    ctx.putImageData(imageData, 0, 0);
+    return canvas;
+}
+
 function canvasToTexture(canvas) {
     const tex = new THREE.CanvasTexture(canvas);
     tex.magFilter = THREE.NearestFilter;
@@ -365,6 +445,47 @@ export function createTextureAtlas() {
     mossyCtx.putImageData(mossyData, 0, 0);
     const mossyTex = canvasToTexture(mossyCanvas);
     faceTextures[BlockType.MOSSY_COBBLE] = { top: mossyTex, side: mossyTex, bottom: mossyTex };
+
+    const eggTex = canvasToTexture(generateEasterEgg());
+    faceTextures[BlockType.EASTER_EGG] = { top: eggTex, side: eggTex, bottom: eggTex };
+
+    const goldenEggTex = canvasToTexture(generateGoldenEgg());
+    faceTextures[BlockType.GOLDEN_EGG] = { top: goldenEggTex, side: goldenEggTex, bottom: goldenEggTex };
+
+    const diamondEggTex = canvasToTexture(generateDiamondEgg());
+    faceTextures[BlockType.DIAMOND_EGG] = { top: diamondEggTex, side: diamondEggTex, bottom: diamondEggTex };
+
+    const lavaTex = canvasToTexture(generateLava());
+    faceTextures[BlockType.LAVA] = { top: lavaTex, side: lavaTex, bottom: lavaTex };
+
+    const candyRedTex = canvasToTexture(generateSimpleTexture(BlockType.CANDY_RED));
+    faceTextures[BlockType.CANDY_RED] = { top: candyRedTex, side: candyRedTex, bottom: candyRedTex };
+
+    const candyWhiteTex = canvasToTexture(generateSimpleTexture(BlockType.CANDY_WHITE));
+    faceTextures[BlockType.CANDY_WHITE] = { top: candyWhiteTex, side: candyWhiteTex, bottom: candyWhiteTex };
+    
+    // Candy Blue has a white swirl!
+    const candyBlueCanvas = createCanvas();
+    const cbCtx = candyBlueCanvas.getContext('2d');
+    const cbData = cbCtx.createImageData(TEX_SIZE, TEX_SIZE);
+    const cbc = BlockColors[BlockType.CANDY_BLUE].top;
+    for (let y = 0; y < TEX_SIZE; y++) {
+        for (let x = 0; x < TEX_SIZE; x++) {
+            const idx = (y * TEX_SIZE + x) * 4;
+            const dist = Math.sqrt((x - 8) ** 2 + (y - 8) ** 2);
+            const angle = Math.atan2(y - 8, x - 8);
+            const swirl = (dist * 0.8 + angle * 2) % (Math.PI * 2) > Math.PI;
+            if (swirl) {
+                cbData.data[idx] = 255; cbData.data[idx+1] = 255; cbData.data[idx+2] = 255;
+            } else {
+                cbData.data[idx] = cbc[0]*255; cbData.data[idx+1] = cbc[1]*255; cbData.data[idx+2] = cbc[2]*255;
+            }
+            cbData.data[idx+3] = 255;
+        }
+    }
+    cbCtx.putImageData(cbData, 0, 0);
+    const candyBlueTex = canvasToTexture(candyBlueCanvas);
+    faceTextures[BlockType.CANDY_BLUE] = { top: candyBlueTex, side: candyBlueTex, bottom: candyBlueTex };
 
     return faceTextures;
 }

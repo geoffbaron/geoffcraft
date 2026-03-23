@@ -54,7 +54,8 @@ const server = http.createServer((req, res) => {
     }
 
     // Static Asset Serving
-    let filePath = req.url === '/' ? '/index.html' : req.url;
+    let reqPath = req.url.split('?')[0];
+    let filePath = reqPath === '/' ? '/index.html' : reqPath;
     filePath = path.join(__dirname, filePath);
     
     const extname = String(path.extname(filePath)).toLowerCase();
@@ -70,12 +71,18 @@ const server = http.createServer((req, res) => {
                 res.end('Server error: ' + error.code);
             }
         } else {
-            res.writeHead(200, { 'Content-Type': contentType });
+            res.writeHead(200, {
+                'Content-Type': contentType,
+                'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+                'Pragma': 'no-cache',
+                'Expires': '0',
+                'Surrogate-Control': 'no-store'
+            });
             res.end(content, 'utf-8');
         }
     });
 });
 
 server.listen(PORT, () => {
-    console.log(`Geoffcraft Easter Egg Hunt Server running at http://localhost:${PORT}/`);
+    console.log(`EasterCraft Easter Egg Hunt Server running at http://localhost:${PORT}/`);
 });

@@ -3,21 +3,30 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GeoffCraft</title>
+    <title>EasterCraft</title>
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
     <div id="menu-screen">
-        <h1>GeoffCraft</h1>
+        <h1>EasterCraft</h1>
         <p>Click to Play</p>
         <div class="controls-info">
             <p>WASD - Move | Space - Jump | Shift - Sprint</p>
             <p>Left Click - Break Block | Right Click - Place Block</p>
             <p>1-9 - Select Block | E - Toggle Inventory | Esc - Pause</p>
         </div>
+        <div class="egg-points-info" style="margin-top: 25px; font-size: 18px; text-shadow: 2px 2px 4px rgba(0,0,0,0.5);">
+            <span style="color: white;">🥚 Easter Egg: <strong>1 pt</strong></span> &nbsp; &nbsp;
+            <span style="color: #ffd700;">🌟 Golden Egg: <strong>10 pts</strong></span> &nbsp; &nbsp;
+            <span style="color: #00ffff;">💎 Diamond Egg: <strong>30 pts</strong></span>
+        </div>
     </div>
     <canvas id="game-canvas"></canvas>
     <div id="hud">
+        <div id="hunter-hud">
+            <div id="time-left">Time: 5:00</div>
+            <div id="eggs-found">Eggs Found: 0</div>
+        </div>
         <div id="crosshair">+</div>
         <div id="hotbar"></div>
         <div id="debug-info"></div>
@@ -25,6 +34,21 @@
     <div id="inventory-screen" class="hidden">
         <div id="inventory-grid"></div>
     </div>
+    
+    <div id="game-over-screen" class="hidden">
+        <div id="game-over-box">
+            <h2>Time's Up!</h2>
+            <p style="font-size: 20px; margin-bottom: 15px;">You found <span id="final-score" style="color: #ffd700; font-weight: bold;">0</span> Easter Eggs!</p>
+            <div id="submission-form">
+                <input type="text" id="player-name-input" placeholder="Enter your name" maxlength="20" autocomplete="off">
+                <br>
+                <button id="submit-score-btn">Submit Score</button>
+            </div>
+            <div id="leaderboard-list" class="hidden">
+            </div>
+        </div>
+    </div>
+
     <script type="importmap">
     {
         "imports": {

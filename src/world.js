@@ -167,11 +167,11 @@ export class World {
                     } else if (y < height - 4) {
                         block = BlockType.STONE;
 
-                        // Caves — slightly more open (lower threshold, closer to surface)
-                        const caveVal = this.caveNoise.noise3D(wx * 0.05, y * 0.07, wz * 0.05);
-                        const caveVal2 = this.caveNoise.noise3D(wx * 0.08, y * 0.1, wz * 0.08);
-                        if (caveVal > 0.40 && caveVal2 > 0.36 && y > 5 && y < height - 5) {
-                            block = BlockType.AIR;
+                        // Caves — tube-shaped winding tunnels via dual-noise cylinder test
+                        const cv1 = this.caveNoise.noise3D(wx * 0.04, y * 0.04, wz * 0.04);
+                        const cv2 = this.caveNoise.noise3D(wx * 0.04 + 100, y * 0.04 + 100, wz * 0.04 + 100);
+                        if (cv1 * cv1 + cv2 * cv2 < 0.025 && y > 5 && y < height - 4) {
+                            block = y < 14 ? BlockType.LAVA : BlockType.AIR;
                         } else {
                             // Ores
                             const oreVal = this.oreNoise.noise3D(wx * 0.15, y * 0.15, wz * 0.15);
@@ -228,6 +228,58 @@ export class World {
                 if (treeNoiseVal > 0.1 && (wx * 19 + wz * 7) % 11 === 0) {
                     this.placeTree(chunk, x, height + 1, z);
                 }
+
+                const candyNoiseVal = this.treeNoise.noise2D(wx * 0.08 + 100, wz * 0.08 + 100);
+                if (candyNoiseVal > 0.2 && (wx * 13 + wz * 17) % 23 === 0) {
+                    this.placeCandyStructure(chunk, x, height + 1, z);
+                }
+            }
+        }
+
+        // Generate Easter Eggs
+        const rand = new Noise(cx * 99 + cz * 33);
+        const numEggs = 2 + Math.floor(Math.abs(rand.noise2D(cx * 1.5, cz * 1.5)) * 4);
+        for (let i = 0; i < numEggs; i++) {
+            const lx = Math.floor(Math.abs(rand.noise2D(i, cx)) * (CHUNK_SIZE - 2)) + 1;
+            const lz = Math.floor(Math.abs(rand.noise2D(cz, i)) * (CHUNK_SIZE - 2)) + 1;
+            const wx = worldX + lx;
+            const wz = worldZ + lz;
+            const height = this.getHeight(wx, wz);
+            
+            if (height > WATER_LEVEL && height < CHUNK_HEIGHT - 3) {
+                const surfaceBlock = chunk.getBlock(lx, height, lz);
+                if (surfaceBlock === BlockType.GRASS || surfaceBlock === BlockType.SNOW || surfaceBlock === BlockType.SAND) {
+                    if (chunk.getBlock(lx, height + 1, lz) === BlockType.AIR) {
+                        const r = Math.random();
+                        let eggType = BlockType.EASTER_EGG;
+                        if (r < 0.002) eggType = BlockType.DIAMOND_EGG;
+                        else if (r < 0.10) eggType = BlockType.GOLDEN_EGG;
+                        chunk.setBlock(lx, height + 1, lz, eggType);
+                    }
+                }
+            }
+        }
+
+        // Generate Cave Easter Eggs
+        const numCaveEggs = 1 + Math.floor(Math.abs(rand.noise2D(cx * 2.1, cz * 2.1)) * 3);
+        for (let i = 0; i < numCaveEggs; i++) {
+            const lx = Math.floor(Math.abs(rand.noise2D(i + 10, cx)) * (CHUNK_SIZE - 2)) + 1;
+            const lz = Math.floor(Math.abs(rand.noise2D(cz, i + 10)) * (CHUNK_SIZE - 2)) + 1;
+            const wx = worldX + lx;
+            const wz = worldZ + lz;
+            const height = this.getHeight(wx, wz);
+            
+            for (let y = 6; y < height - 5; y++) {
+                if (chunk.getBlock(lx, y, lz) === BlockType.AIR && chunk.getBlock(lx, y - 1, lz) === BlockType.STONE) {
+                    if (chunk.getBlock(lx, y + 1, lz) === BlockType.AIR) {
+                        const r = Math.random();
+                        let eggType = BlockType.EASTER_EGG;
+                        if (r < 0.10) eggType = BlockType.DIAMOND_EGG; // 10% underground vs 0.2% surface
+                        else if (r < 0.50) eggType = BlockType.GOLDEN_EGG; // 40% underground vs 10% surface
+                        chunk.setBlock(lx, y, lz, eggType);
+                        break;
+                    }
+                }
             }
         }
 
@@ -277,116 +329,109 @@ export class World {
 
     generateCaveEntrances(chunk, cx, cz, worldX, worldZ) {
         const hash = chunkStructureHash(cx, cz);
+        const DIRS = [[1,0],[-1,0],[0,1],[0,-1]];
 
-        // ── 1. Sinkhole/crater entrance (~1 in 3 chunks) ──────────────────────
-        const sHash = (hash ^ 0xCA7E0) >>> 0;
-        if (sHash % 3 === 0) {
-            const ex = 4 + (sHash % (CHUNK_SIZE - 8));
-            const ez = 4 + ((sHash >>> 8) % (CHUNK_SIZE - 8));
-            const ewx = worldX + ex, ewz = worldZ + ez;
-            const eh  = this.getHeight(ewx, ewz);
-
-            if (eh > WATER_LEVEL + 10 && eh < 70) {
-                const topR  = 3 + (sHash & 1);       // opening radius 3 or 4
-                const depth = 20 + (sHash >> 4 & 7); // shaft depth 20–27 blocks
-
-                for (let d = 0; d <= depth; d++) {
-                    const y = eh - d;
-                    if (y < 4) break;
-                    // Funnel: wide bowl at top, narrows to a shaft at d = topR
-                    const r  = d < topR ? topR + 1.5 - d : 1.6;
-                    const ri = Math.ceil(r);
-                    for (let dx = -ri; dx <= ri; dx++) {
-                        for (let dz = -ri; dz <= ri; dz++) {
-                            if (dx * dx + dz * dz <= r * r) {
-                                const bx = ex + dx, bz = ez + dz;
-                                if (bx >= 0 && bx < CHUNK_SIZE && bz >= 0 && bz < CHUNK_SIZE)
-                                    chunk.setBlock(bx, y, bz, BlockType.AIR);
-                            }
-                        }
-                    }
-                }
-
-                // Torches spaced along the shaft floor
-                for (let td = topR + 5; td < depth; td += 7) {
-                    const ty = eh - td;
-                    if (ty < 5) break;
-                    if (chunk.getBlock(ex, ty, ez) === BlockType.AIR &&
-                        isBlockSolid(chunk.getBlock(ex, ty - 1, ez))) {
-                        chunk.setBlock(ex, ty, ez, BlockType.TORCH);
-                    }
-                }
-            }
-        }
-
-        // ── 2. Hillside mine arch (~1 in 3 chunks, different pattern) ─────────
-        const hHash = (hash ^ 0xA4C47) >>> 0;
-        if (hHash % 3 === 1) {
-            const ex = 4 + (hHash % (CHUNK_SIZE - 8));
-            const ez = 4 + ((hHash >>> 8) % (CHUNK_SIZE - 8));
-            const ewx = worldX + ex, ewz = worldZ + ez;
+        // Try up to 6 candidate positions per chunk; stop after one successful arch
+        for (let attempt = 0; attempt < 6; attempt++) {
+            const aHash = (hash ^ (attempt * 0x3F9A7 + 0xC0FFEE)) >>> 0;
+            const ex = 3 + (aHash % (CHUNK_SIZE - 6));
+            const ez = 3 + ((aHash >>> 8) % (CHUNK_SIZE - 6));
+            const ewx = worldX + ex;
+            const ewz = worldZ + ez;
             const ehLow = this.getHeight(ewx, ewz);
 
-            if (ehLow > WATER_LEVEL + 6 && ehLow < 75) {
-                // Find the steepest adjacent slope (must rise ≥8 blocks in 5 steps)
-                const DIRS = [[1,0],[-1,0],[0,1],[0,-1]];
-                let archDir = null, bestSlope = 7;
-                for (const [adx, adz] of DIRS) {
-                    const slope = this.getHeight(ewx + adx * 5, ewz + adz * 5) - ehLow;
-                    if (slope > bestSlope) { bestSlope = slope; archDir = [adx, adz]; }
-                }
+            // Only place entrances on mid-elevation land (not ocean, not snow peaks)
+            if (ehLow <= WATER_LEVEL + 6 || ehLow >= 80) continue;
 
-                if (archDir) {
-                    const [adx, adz] = archDir;
-                    const archLen = 9 + (hHash >> 4 & 3); // tunnel 9–12 blocks deep
-                    const W = 1;   // half-width perpendicular to arch (total 3 wide)
-                    const H = 4;   // arch height
+            // Find a direction where the terrain rises ≥4 blocks over 4 horizontal steps
+            let archDir = null;
+            let bestSlope = 3;
+            for (const [adx, adz] of DIRS) {
+                const slope = this.getHeight(ewx + adx * 4, ewz + adz * 4) - ehLow;
+                if (slope > bestSlope) { bestSlope = slope; archDir = [adx, adz]; }
+            }
+            if (!archDir) continue; // flat ground — try next candidate
 
-                    // Carve the horizontal tunnel INTO the hillside
-                    for (let t = 0; t <= archLen; t++) {
-                        for (let s = -W; s <= W; s++) {
-                            for (let up = 0; up < H; up++) {
-                                // Perpendicular direction: (-adz, adx)
-                                const bx = ex + adx * t - adz * s;
-                                const bz = ez + adz * t + adx * s;
-                                const by = ehLow + up;
-                                if (bx >= 0 && bx < CHUNK_SIZE && bz >= 0 && bz < CHUNK_SIZE
-                                    && by >= 0 && by < CHUNK_HEIGHT)
-                                    chunk.setBlock(bx, by, bz, BlockType.AIR);
-                            }
-                        }
-                    }
+            const [adx, adz] = archDir;
+            const archLen = 10 + (aHash >> 4 & 3); // 10–13 blocks deep
 
-                    // Vertical shaft connecting tunnel to deeper cave network
-                    const sxEnd = ex + adx * archLen;
-                    const szEnd = ez + adz * archLen;
-                    const shaftDepth = 16 + (hHash >> 8 & 7);
-                    for (let d = 1; d <= shaftDepth; d++) {
-                        const sy = ehLow - d;
-                        if (sy < 4) break;
-                        for (let s = -W; s <= W; s++) {
-                            for (let t2 = -W; t2 <= W; t2++) {
-                                const bx = sxEnd - adz * s + adx * t2;
-                                const bz = szEnd + adx * s + adz * t2;
-                                if (bx >= 0 && bx < CHUNK_SIZE && bz >= 0 && bz < CHUNK_SIZE)
-                                    chunk.setBlock(bx, sy, bz, BlockType.AIR);
-                            }
-                        }
-                    }
-
-                    // Torches: one just inside entrance, one deep in the tunnel
-                    for (const torchT of [2, Math.floor(archLen * 0.65)]) {
-                        const tx = ex + adx * torchT;
-                        const tz = ez + adz * torchT;
-                        if (tx >= 0 && tx < CHUNK_SIZE && tz >= 0 && tz < CHUNK_SIZE) {
-                            if (chunk.getBlock(tx, ehLow, tz) === BlockType.AIR &&
-                                isBlockSolid(chunk.getBlock(tx, ehLow - 1, tz))) {
-                                chunk.setBlock(tx, ehLow, tz, BlockType.TORCH);
-                            }
+            // ── Carve a 5-wide × 5-tall arch with rounded top INTO the hillside ──
+            // Row layout (bottom to top):  rows 0-2 → full width 5 (half=2),
+            //                              row 3     → width 3     (half=1),
+            //                              row 4     → width 1     (half=0, centre only)
+            const archProfile = [2, 2, 2, 1, 0]; // half-width per row
+            for (let t = 0; t <= archLen; t++) {
+                for (let row = 0; row < archProfile.length; row++) {
+                    const hw = archProfile[row];
+                    for (let s = -hw; s <= hw; s++) {
+                        const bx = ex + adx * t - adz * s;
+                        const bz = ez + adz * t + adx * s;
+                        const by = ehLow + row;
+                        if (bx >= 0 && bx < CHUNK_SIZE && bz >= 0 && bz < CHUNK_SIZE
+                            && by >= 0 && by < CHUNK_HEIGHT) {
+                            chunk.setBlock(bx, by, bz, BlockType.AIR);
                         }
                     }
                 }
             }
+
+            // ── Small cave chamber at the end of the tunnel ──────────────────
+            const chamberX = ex + adx * (archLen + 2);
+            const chamberZ = ez + adz * (archLen + 2);
+            const chamberR = 3;
+            for (let dx = -chamberR; dx <= chamberR; dx++) {
+                for (let dz2 = -chamberR; dz2 <= chamberR; dz2++) {
+                    if (dx * dx + dz2 * dz2 > chamberR * chamberR) continue;
+                    for (let row = 0; row < 5; row++) {
+                        const bx = chamberX + dx;
+                        const bz = chamberZ + dz2;
+                        const by = ehLow + row;
+                        if (bx >= 0 && bx < CHUNK_SIZE && bz >= 0 && bz < CHUNK_SIZE
+                            && by >= 0 && by < CHUNK_HEIGHT) {
+                            chunk.setBlock(bx, by, bz, BlockType.AIR);
+                        }
+                    }
+                }
+            }
+
+            // ── Vertical shaft from chamber floor down to deep cave network ───
+            const shaftDepth = 20 + (aHash >> 8 & 7); // 20–27 blocks
+            for (let d = 1; d <= shaftDepth; d++) {
+                const sy = ehLow - d;
+                if (sy < 4) break;
+                // 3-wide cross shaft
+                for (let s = -1; s <= 1; s++) {
+                    for (let t2 = -1; t2 <= 1; t2++) {
+                        if (Math.abs(s) + Math.abs(t2) > 1) continue; // plus-sign
+                        const bx = chamberX + s;
+                        const bz = chamberZ + t2;
+                        if (bx >= 0 && bx < CHUNK_SIZE && bz >= 0 && bz < CHUNK_SIZE) {
+                            chunk.setBlock(bx, sy, bz, BlockType.AIR);
+                        }
+                    }
+                }
+            }
+
+            // ── Torches: one near entrance, one midway inside tunnel ──────────
+            for (const torchT of [2, Math.floor(archLen * 0.55)]) {
+                const tx = ex + adx * torchT;
+                const tz = ez + adz * torchT;
+                if (tx >= 0 && tx < CHUNK_SIZE && tz >= 0 && tz < CHUNK_SIZE) {
+                    if (chunk.getBlock(tx, ehLow, tz) === BlockType.AIR &&
+                        isBlockSolid(chunk.getBlock(tx, ehLow - 1, tz))) {
+                        chunk.setBlock(tx, ehLow, tz, BlockType.TORCH);
+                    }
+                }
+            }
+            // Torch in the chamber too
+            if (chamberX >= 0 && chamberX < CHUNK_SIZE && chamberZ >= 0 && chamberZ < CHUNK_SIZE) {
+                if (chunk.getBlock(chamberX, ehLow, chamberZ) === BlockType.AIR &&
+                    isBlockSolid(chunk.getBlock(chamberX, ehLow - 1, chamberZ))) {
+                    chunk.setBlock(chamberX, ehLow, chamberZ, BlockType.TORCH);
+                }
+            }
+
+            break; // one arch per chunk is plenty
         }
     }
 
@@ -443,6 +488,51 @@ export class World {
                         }
                     }
                 }
+            }
+        }
+    }
+
+    placeCandyStructure(chunk, x, baseY, z) {
+        if (Math.random() < 0.5) {
+            // Giant Lollipop
+            const stickHeight = 5 + Math.floor(Math.random() * 3);
+            for (let y = 0; y < stickHeight; y++) {
+                chunk.setBlock(x, baseY + y, z, BlockType.CANDY_WHITE);
+            }
+            const headColor = Math.random() < 0.5 ? BlockType.CANDY_BLUE : BlockType.CANDY_RED;
+            const r = 2;
+            const headStartY = baseY + stickHeight;
+            for (let dy = -r; dy <= r; dy++) {
+                for (let dx = -r; dx <= r; dx++) {
+                    for (let dz = -1; dz <= 1; dz++) {
+                        if (dx*dx + dy*dy <= r*r && x+dx >= 0 && x+dx < CHUNK_SIZE && z+dz >= 0 && z+dz < CHUNK_SIZE) {
+                            chunk.setBlock(x+dx, headStartY+dy, z+dz, headColor);
+                        }
+                    }
+                }
+            }
+        } else {
+            // Giant Candy Cane
+            const height = 6 + Math.floor(Math.random() * 4);
+            for (let y = 0; y < height; y++) {
+                const color = (y % 2 === 0) ? BlockType.CANDY_RED : BlockType.CANDY_WHITE;
+                chunk.setBlock(x, baseY + y, z, color);
+            }
+            const archY = baseY + height;
+            const isX = Math.random() < 0.5;
+            const dir = Math.random() < 0.5 ? 1 : -1;
+            
+            // Just place the arch blocks cleanly within bounds
+            const offsets = [[1, 0], [2, 0], [2, -1], [2, -2]];
+            let currentColor = (height % 2 === 0) ? BlockType.CANDY_RED : BlockType.CANDY_WHITE;
+            
+            for (const [o, dy] of offsets) {
+                const dx = isX ? dir * o : 0;
+                const dz = !isX ? dir * o : 0;
+                if (x + dx >= 0 && x + dx < CHUNK_SIZE && z + dz >= 0 && z + dz < CHUNK_SIZE) {
+                    chunk.setBlock(x + dx, archY + dy, z + dz, currentColor);
+                }
+                currentColor = (currentColor === BlockType.CANDY_RED) ? BlockType.CANDY_WHITE : BlockType.CANDY_RED;
             }
         }
     }

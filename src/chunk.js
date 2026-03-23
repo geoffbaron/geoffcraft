@@ -62,9 +62,11 @@ export class Chunk {
         // Group faces by block type and face direction for batched rendering
         const solidGeomData = { positions: [], normals: [], uvs: [], colors: [], indices: [] };
         const waterGeomData = { positions: [], normals: [], uvs: [], colors: [], indices: [] };
+        const lavaGeomData = { positions: [], normals: [], uvs: [], colors: [], indices: [] };
 
         let solidVertCount = 0;
         let waterVertCount = 0;
+        let lavaVertCount = 0;
 
         for (let y = 0; y < CHUNK_HEIGHT; y++) {
             for (let z = 0; z < CHUNK_SIZE; z++) {
@@ -73,7 +75,9 @@ export class Chunk {
                     if (block === BlockType.AIR) continue;
 
                     const isWater = block === BlockType.WATER;
-                    const geom = isWater ? waterGeomData : solidGeomData;
+                    const isLava = block === BlockType.LAVA;
+                    const isFluid = isWater || isLava;
+                    const geom = isFluid ? (isWater ? waterGeomData : lavaGeomData) : solidGeomData;
 
                     // Check each face
                     for (const face of FACES) {
@@ -82,14 +86,14 @@ export class Chunk {
                         const nz = z + face.dir[2];
                         const neighbor = this.getBlock(nx, ny, nz);
 
-                        // Render face if neighbor is transparent (and not same type for water)
-                        const shouldRender = isWater
-                            ? (neighbor !== BlockType.WATER && isBlockTransparent(neighbor))
+                        // Render face if neighbor is transparent (and not same type for fluid)
+                        const shouldRender = isFluid
+                            ? (neighbor !== block && isBlockTransparent(neighbor))
                             : (isBlockTransparent(neighbor) && neighbor !== block);
 
                         if (!shouldRender) continue;
 
-                        const vertCount = isWater ? waterVertCount : solidVertCount;
+                        const vertCount = isFluid ? (isWater ? waterVertCount : lavaVertCount) : solidVertCount;
 
                         // Add face vertices
                         for (let i = 0; i < 4; i++) {
@@ -113,6 +117,7 @@ export class Chunk {
                         );
 
                         if (isWater) waterVertCount += 4;
+                        else if (isLava) lavaVertCount += 4;
                         else solidVertCount += 4;
                     }
                 }
@@ -134,6 +139,14 @@ export class Chunk {
             this.waterMesh.receiveShadow = true;
             this.waterMesh.position.set(this.cx * CHUNK_SIZE, 0, this.cz * CHUNK_SIZE);
             this.world.scene.add(this.waterMesh);
+        }
+
+        if (lavaGeomData.positions.length > 0) {
+            this.lavaMesh = this.buildGeometryMesh(lavaGeomData, true);
+            this.lavaMesh.castShadow = true;
+            this.lavaMesh.receiveShadow = true;
+            this.lavaMesh.position.set(this.cx * CHUNK_SIZE, 0, this.cz * CHUNK_SIZE);
+            this.world.scene.add(this.lavaMesh);
         }
 
         this.dirty = false;
@@ -182,18 +195,27 @@ export class Chunk {
             this.torchMesh.geometry.dispose();
             this.torchMesh = null;
         }
+        if (this.eggMesh) {
+            this.world.scene.remove(this.eggMesh);
+            this.eggMesh.material.dispose();
+            this.eggMesh.geometry.dispose();
+            this.eggMesh = null;
+        }
 
         // Group geometry by material key (blockType + faceType)
         const groups = {};
         const waterGeom = { positions: [], normals: [], uvs: [], colors: [], indices: [], vertCount: 0 };
+        const lavaGeom = { positions: [], normals: [], uvs: [], colors: [], indices: [], vertCount: 0 };
 
         for (let y = 0; y < CHUNK_HEIGHT; y++) {
             for (let z = 0; z < CHUNK_SIZE; z++) {
                 for (let x = 0; x < CHUNK_SIZE; x++) {
                     const block = this.blocks[this.getIndex(x, y, z)];
-                    // Skip AIR and TORCH (torch gets its own cross mesh)
-                    if (block === BlockType.AIR || block === BlockType.TORCH) continue;
+                    // Skip AIR, TORCH, EASTER_EGG, GOLDEN_EGG, DIAMOND_EGG (which get custom meshes)
+                    if (block === BlockType.AIR || block === BlockType.TORCH || block === BlockType.EASTER_EGG || block === BlockType.GOLDEN_EGG || block === BlockType.DIAMOND_EGG) continue;
                     const isWater = block === BlockType.WATER;
+                    const isLava = block === BlockType.LAVA;
+                    const isFluid = isWater || isLava;
 
                     for (const face of FACES) {
                         const nx = x + face.dir[0];
@@ -201,32 +223,33 @@ export class Chunk {
                         const nz = z + face.dir[2];
                         const neighbor = this.getBlock(nx, ny, nz);
 
-                        const shouldRender = isWater
-                            ? (neighbor !== BlockType.WATER && isBlockTransparent(neighbor))
+                        const shouldRender = isFluid
+                            ? (neighbor !== block && isBlockTransparent(neighbor))
                             : (isBlockTransparent(neighbor) && neighbor !== block);
 
                         if (!shouldRender) continue;
 
-                        if (isWater) {
-                            const aboveIsWater = this.getBlock(x, y + 1, z) === BlockType.WATER;
-                            const vc = waterGeom.vertCount;
+                        if (isFluid) {
+                            const activeGeom = isWater ? waterGeom : lavaGeom;
+                            const aboveIsSame = this.getBlock(x, y + 1, z) === block;
+                            const vc = activeGeom.vertCount;
                             for (let i = 0; i < 4; i++) {
                                 const v = face.vertices[i];
                                 let yPos = v[1];
                                 // Smooth surface: top face corners slope based on neighboring meta values
-                                if (face.dir[1] === 1 && yPos === 1 && !aboveIsWater) {
-                                    yPos = getWaterCornerHeight(this, x, y, z, v[0], v[2]);
-                                } else if (!aboveIsWater && yPos === 1 && face.dir[1] === 0) {
+                                if (face.dir[1] === 1 && yPos === 1 && !aboveIsSame) {
+                                    yPos = getFluidCornerHeight(this, x, y, z, v[0], v[2], block);
+                                } else if (!aboveIsSame && yPos === 1 && face.dir[1] === 0) {
                                     // Side faces: top edge uses this block's surface height
-                                    yPos = getWaterSurfaceHeight(this, x, y, z);
+                                    yPos = getFluidSurfaceHeight(this, x, y, z, block);
                                 }
-                                waterGeom.positions.push(x + v[0], y + yPos, z + v[2]);
-                                waterGeom.normals.push(...face.dir);
-                                waterGeom.uvs.push(face.uvs[i][0], face.uvs[i][1]);
-                                waterGeom.colors.push(1, 1, 1);
+                                activeGeom.positions.push(x + v[0], y + yPos, z + v[2]);
+                                activeGeom.normals.push(...face.dir);
+                                activeGeom.uvs.push(face.uvs[i][0], face.uvs[i][1]);
+                                activeGeom.colors.push(1, 1, 1);
                             }
-                            waterGeom.indices.push(vc, vc + 1, vc + 2, vc, vc + 2, vc + 3);
-                            waterGeom.vertCount += 4;
+                            activeGeom.indices.push(vc, vc + 1, vc + 2, vc, vc + 2, vc + 3);
+                            activeGeom.vertCount += 4;
                             continue;
                         }
 
@@ -340,10 +363,125 @@ export class Chunk {
             this.world.scene.add(this.waterMesh);
         }
 
+        // Lava mesh
+        if (lavaGeom.positions.length > 0) {
+            const lGeometry = new THREE.BufferGeometry();
+            lGeometry.setAttribute('position', new THREE.Float32BufferAttribute(lavaGeom.positions, 3));
+            lGeometry.setAttribute('normal', new THREE.Float32BufferAttribute(lavaGeom.normals, 3));
+            lGeometry.setAttribute('uv', new THREE.Float32BufferAttribute(lavaGeom.uvs, 2));
+            lGeometry.setAttribute('color', new THREE.Float32BufferAttribute(lavaGeom.colors, 3));
+            lGeometry.setIndex(lavaGeom.indices);
+
+            const lTex = faceTextures[BlockType.LAVA]?.top;
+            const lMat = new THREE.MeshLambertMaterial({
+                map: lTex || null,
+                vertexColors: true,
+                transparent: true,
+                opacity: 0.9,
+                side: THREE.DoubleSide,
+                emissive: 0xaa4400,
+                color: 0xff8833,
+            });
+            this.lavaMesh = new THREE.Mesh(lGeometry, lMat);
+            this.lavaMesh.castShadow = true;
+            this.lavaMesh.receiveShadow = true;
+            this.lavaMesh.position.set(this.cx * CHUNK_SIZE, 0, this.cz * CHUNK_SIZE);
+            this.world.scene.add(this.lavaMesh);
+        }
+
         // Build torch cross mesh
         this.buildTorchMesh();
 
+        // Build 3D egg instanced mesh
+        this.buildEggMesh(faceTextures);
+
         this.dirty = false;
+    }
+
+    buildEggMesh(faceTextures) {
+        if (this.eggMesh) { this.world.scene.remove(this.eggMesh); this.eggMesh.geometry.dispose(); this.eggMesh.material.dispose(); this.eggMesh = null; }
+        if (this.goldenEggMesh) { this.world.scene.remove(this.goldenEggMesh); this.goldenEggMesh.geometry.dispose(); this.goldenEggMesh.material.dispose(); this.goldenEggMesh = null; }
+        if (this.diamondEggMesh) { this.world.scene.remove(this.diamondEggMesh); this.diamondEggMesh.geometry.dispose(); this.diamondEggMesh.material.dispose(); this.diamondEggMesh = null; }
+
+        const normalEggs = [];
+        const goldenEggs = [];
+        const diamondEggs = [];
+        const worldX = this.cx * CHUNK_SIZE;
+        const worldZ = this.cz * CHUNK_SIZE;
+
+        for (let lz = 0; lz < CHUNK_SIZE; lz++) {
+            for (let lx = 0; lx < CHUNK_SIZE; lx++) {
+                for (let ly = 0; ly < CHUNK_HEIGHT; ly++) {
+                    const bt = this.blocks[this.getIndex(lx, ly, lz)];
+                    if (bt === BlockType.EASTER_EGG) {
+                        normalEggs.push({ x: worldX + lx + 0.5, y: ly + 0.5, z: worldZ + lz + 0.5 });
+                    } else if (bt === BlockType.GOLDEN_EGG) {
+                        goldenEggs.push({ x: worldX + lx + 0.5, y: ly + 0.5, z: worldZ + lz + 0.5 });
+                    } else if (bt === BlockType.DIAMOND_EGG) {
+                        diamondEggs.push({ x: worldX + lx + 0.5, y: ly + 0.5, z: worldZ + lz + 0.5 });
+                    }
+                }
+            }
+        }
+
+        if (normalEggs.length === 0 && goldenEggs.length === 0 && diamondEggs.length === 0) return;
+
+        // Shape a sphere into an egg
+        const geo = new THREE.SphereGeometry(0.35, 24, 24);
+        const posAttr = geo.attributes.position;
+        for (let i = 0; i < posAttr.count; i++) {
+            let y = posAttr.getY(i);
+            const taper = y > 0 ? 1.0 - (y * 0.7) : 1.0; 
+            posAttr.setX(i, posAttr.getX(i) * taper);
+            posAttr.setZ(i, posAttr.getZ(i) * taper);
+            posAttr.setY(i, y * 1.5 - 0.35); 
+        }
+        geo.computeVertexNormals();
+
+        if (normalEggs.length > 0) {
+            const tex = faceTextures[BlockType.EASTER_EGG]?.top;
+            const mat = new THREE.MeshLambertMaterial({ map: tex || null });
+            this.eggMesh = new THREE.InstancedMesh(geo, mat, normalEggs.length);
+            this.eggMesh.castShadow = true; this.eggMesh.receiveShadow = true;
+            const dummy = new THREE.Object3D();
+            for (let i = 0; i < normalEggs.length; i++) {
+                dummy.position.set(normalEggs[i].x, normalEggs[i].y, normalEggs[i].z);
+                dummy.rotation.y = (normalEggs[i].x * 13 + normalEggs[i].z * 7) % Math.PI;
+                dummy.updateMatrix();
+                this.eggMesh.setMatrixAt(i, dummy.matrix);
+            }
+            this.world.scene.add(this.eggMesh);
+        }
+
+        if (goldenEggs.length > 0) {
+            const tex = faceTextures[BlockType.GOLDEN_EGG]?.top;
+            const mat = new THREE.MeshLambertMaterial({ map: tex || null, emissive: 0x443300 }); // Shiny inner glow
+            this.goldenEggMesh = new THREE.InstancedMesh(geo, mat, goldenEggs.length);
+            this.goldenEggMesh.castShadow = true; this.goldenEggMesh.receiveShadow = true;
+            const dummy = new THREE.Object3D();
+            for (let i = 0; i < goldenEggs.length; i++) {
+                dummy.position.set(goldenEggs[i].x, goldenEggs[i].y, goldenEggs[i].z);
+                dummy.rotation.y = (goldenEggs[i].x * 13 + goldenEggs[i].z * 7) % Math.PI;
+                dummy.updateMatrix();
+                this.goldenEggMesh.setMatrixAt(i, dummy.matrix);
+            }
+            this.world.scene.add(this.goldenEggMesh);
+        }
+
+        if (diamondEggs.length > 0) {
+            const tex = faceTextures[BlockType.DIAMOND_EGG]?.top;
+            const mat = new THREE.MeshLambertMaterial({ map: tex || null, emissive: 0x004455 }); // Shiny cyan glow
+            this.diamondEggMesh = new THREE.InstancedMesh(geo, mat, diamondEggs.length);
+            this.diamondEggMesh.castShadow = true; this.diamondEggMesh.receiveShadow = true;
+            const dummy = new THREE.Object3D();
+            for (let i = 0; i < diamondEggs.length; i++) {
+                dummy.position.set(diamondEggs[i].x, diamondEggs[i].y, diamondEggs[i].z);
+                dummy.rotation.y = (diamondEggs[i].x * 13 + diamondEggs[i].z * 7) % Math.PI;
+                dummy.updateMatrix();
+                this.diamondEggMesh.setMatrixAt(i, dummy.matrix);
+            }
+            this.world.scene.add(this.diamondEggMesh);
+        }
     }
 
     buildTorchMesh() {
@@ -447,33 +585,45 @@ export class Chunk {
             this.torchMesh.material.dispose();
             this.torchMesh = null;
         }
+        if (this.eggMesh) {
+            this.world.scene.remove(this.eggMesh);
+            this.eggMesh.geometry.dispose();
+            this.eggMesh.material.dispose();
+            this.eggMesh = null;
+        }
+        if (this.goldenEggMesh) {
+            this.world.scene.remove(this.goldenEggMesh);
+            this.goldenEggMesh.geometry.dispose();
+            this.goldenEggMesh.material.dispose();
+            this.goldenEggMesh = null;
+        }
     }
 }
 
-// --- Water surface helpers ---
+// --- Fluid surface helpers ---
 
-// Returns the visual surface height [0..1] of a water block at (lx, ly, lz).
-// Returns -1 if not water.
-function getWaterSurfaceHeight(chunk, lx, ly, lz) {
+// Returns the visual surface height [0..1] of a fluid block at (lx, ly, lz).
+// Returns -1 if not fluid.
+function getFluidSurfaceHeight(chunk, lx, ly, lz, fluidType) {
     const block = chunk.getBlock(lx, ly, lz);
-    if (block !== BlockType.WATER) return -1;
-    if (chunk.getBlock(lx, ly + 1, lz) === BlockType.WATER) return 1.0;
+    if (block !== fluidType) return -1;
+    if (chunk.getBlock(lx, ly + 1, lz) === fluidType) return 1.0;
     const meta = chunk.getBlockMeta(lx, ly, lz);
     return (8 - Math.min(meta, 7)) / 8;
 }
 
-// Returns the corner height for a water block's top face.
+// Returns the corner height for a fluid block's top face.
 // (vx, vz) are 0 or 1 — the corner's XZ offset within the block.
 // Averages the surface heights of the 4 blocks sharing that corner.
-function getWaterCornerHeight(chunk, lx, ly, lz, vx, vz) {
+function getFluidCornerHeight(chunk, lx, ly, lz, vx, vz, fluidType) {
     const xs = vx === 0 ? [lx - 1, lx] : [lx, lx + 1];
     const zs = vz === 0 ? [lz - 1, lz] : [lz, lz + 1];
     let total = 0;
     let count = 0;
     for (const cx of xs) {
         for (const cz of zs) {
-            const h = getWaterSurfaceHeight(chunk, cx, ly, cz);
-            if (h === 1.0) return 1.0; // falling water above → full corner
+            const h = getFluidSurfaceHeight(chunk, cx, ly, cz, fluidType);
+            if (h === 1.0) return 1.0; // falling fluid above → full corner
             if (h > 0) { total += h; count++; }
         }
     }

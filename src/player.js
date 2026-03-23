@@ -2,9 +2,9 @@ import * as THREE from 'three';
 import { isBlockSolid, BlockType } from './blocks.js';
 
 const GRAVITY = 25;
-const JUMP_FORCE = 9;
-const MOVE_SPEED = 5;
-const SPRINT_SPEED = 8;
+const JUMP_FORCE = 16;
+const MOVE_SPEED = 5.5;
+const SPRINT_SPEED = 8.8;
 const FLY_SPEED = 15;
 const FLY_SPRINT_SPEED = 40;
 const PLAYER_HEIGHT = 1.7;
@@ -34,15 +34,6 @@ export class Player {
     setupControls() {
         document.addEventListener('keydown', (e) => {
             this.keys[e.code] = true;
-            // Double-tap Space to toggle fly mode
-            if (e.code === 'Space') {
-                const now = performance.now();
-                if (now - this.lastSpaceTap < 300) {
-                    this.flying = !this.flying;
-                    this.velocity.y = 0;
-                }
-                this.lastSpaceTap = now;
-            }
         });
         document.addEventListener('keyup', (e) => {
             this.keys[e.code] = false;

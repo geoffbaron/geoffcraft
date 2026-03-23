@@ -4,6 +4,7 @@ import { Player } from './player.js';
 import { UI } from './ui.js';
 import { BlockType } from './blocks.js';
 import { createTextureAtlas } from './textures.js';
+import { Bunny } from './bunny.js';
 
 class Game {
     constructor() {
@@ -99,6 +100,15 @@ class Game {
         this.player = new Player(this.camera, this.world);
         this.player.findSpawnPosition();
 
+        // Spawn Giant Hopping Bunnies
+        this.bunnies = [];
+        for (let i = 0; i < 15; i++) {
+            const bx = this.player.position.x + (Math.random() - 0.5) * 100;
+            const bz = this.player.position.z + (Math.random() - 0.5) * 100;
+            const by = 130; // drop from sky
+            this.bunnies.push(new Bunny(this.world, bx, by, bz));
+        }
+
         // Set initial camera position — look slightly downward so terrain is visible on menu
         this.camera.position.copy(this.player.position);
         this.camera.position.y += 1.7;
@@ -122,6 +132,11 @@ class Game {
 
         // Block break/place cooldown
         this.actionCooldown = 0;
+
+        // Easter Egg Hunt State
+        this.eggsFound = 0;
+        this.timeLeft = 180; // 3 minutes (seconds)
+        this.gameOver = false;
 
         this.setupEvents();
         this.animate();
@@ -161,6 +176,7 @@ class Game {
         // Block interaction
         this.canvas.addEventListener('mousedown', (e) => {
             if (!this.player.mouseLocked) return;
+            if (this.gameOver) return;
             if (this.actionCooldown > 0) return;
 
             const origin = this.camera.position.clone();
@@ -171,6 +187,18 @@ class Game {
 
             if (e.button === 0) {
                 // Left click - break
+                // Award Egg Collectible logic if an Egg was struck!
+                if (hit.block.type === BlockType.EASTER_EGG || hit.block.type === BlockType.GOLDEN_EGG || hit.block.type === BlockType.DIAMOND_EGG) {
+                    this.world.setBlock(hit.block.x, hit.block.y, hit.block.z, BlockType.AIR);
+                    if (hit.block.type === BlockType.EASTER_EGG) this.eggsFound += 1;
+                    else if (hit.block.type === BlockType.GOLDEN_EGG) this.eggsFound += 10;
+                    else if (hit.block.type === BlockType.DIAMOND_EGG) this.eggsFound += 30;
+                    
+                    this.ui.updateHunterHUD(Math.ceil(this.timeLeft), this.eggsFound);
+                    this.actionCooldown = 0.2;
+                    return;
+                }
+                
                 this.world.setBlock(hit.block.x, hit.block.y, hit.block.z, BlockType.AIR);
                 this.actionCooldown = 0.2;
             } else if (e.button === 2) {
@@ -260,6 +288,9 @@ class Game {
 
         if (this.started && this.player.mouseLocked) {
             this.player.update(dt);
+            for (const bunny of this.bunnies) {
+                bunny.update(dt);
+            }
 
             // Block highlight
             const origin = this.camera.position.clone();
@@ -280,7 +311,23 @@ class Game {
         // Update debug info
         this.ui.updateDebugInfo(this.player, this.fps);
 
+        // Easter Egg Timer
+        if (this.started && !this.gameOver) {
+            this.timeLeft -= dt;
+            if (this.timeLeft <= 0) {
+                this.timeLeft = 0;
+                this.triggerGameOver();
+            }
+            this.ui.updateHunterHUD(this.timeLeft, this.eggsFound);
+        }
+
         this.renderer.render(this.scene, this.camera);
+    }
+
+    triggerGameOver() {
+        this.gameOver = true;
+        document.exitPointerLock();
+        this.ui.showGameOver(this.eggsFound);
     }
 
     updateTorchLights(dt, now) {

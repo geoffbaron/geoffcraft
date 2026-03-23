@@ -20,6 +20,13 @@ export const BlockType = {
     ICE: 17,
     MOSSY_COBBLE: 18,
     TORCH: 19,
+    EASTER_EGG: 20,
+    GOLDEN_EGG: 21,
+    CANDY_RED: 22,
+    CANDY_WHITE: 23,
+    CANDY_BLUE: 24,
+    DIAMOND_EGG: 25,
+    LAVA: 26,
 };
 
 // Block properties
@@ -44,6 +51,13 @@ export const BlockData = {
     [BlockType.ICE]:         { name: 'Ice',         solid: true,  transparent: true  },
     [BlockType.MOSSY_COBBLE]:{ name: 'Mossy Stone', solid: true,  transparent: false },
     [BlockType.TORCH]:       { name: 'Torch',       solid: false, transparent: true  },
+    [BlockType.EASTER_EGG]:  { name: 'Easter Egg',  solid: false, transparent: true  },
+    [BlockType.GOLDEN_EGG]:  { name: 'Golden Egg',  solid: false, transparent: true  },
+    [BlockType.CANDY_RED]:   { name: 'Candy Red',   solid: true,  transparent: false },
+    [BlockType.CANDY_WHITE]: { name: 'Candy White', solid: true,  transparent: false },
+    [BlockType.CANDY_BLUE]:  { name: 'Candy Blue',  solid: true,  transparent: false },
+    [BlockType.DIAMOND_EGG]: { name: 'Diamond Egg', solid: false, transparent: true  },
+    [BlockType.LAVA]:        { name: 'Lava',        solid: false, transparent: true  },
 };
 
 // Color definitions for each block face [top, bottom, side] as RGB arrays
@@ -66,6 +80,13 @@ export const BlockColors = {
     [BlockType.BRICK]:       { top: [0.6, 0.3, 0.25],  bottom: [0.6, 0.3, 0.25],  side: [0.58, 0.28, 0.22] },
     [BlockType.ICE]:         { top: [0.55, 0.75, 0.95], bottom: [0.55, 0.75, 0.95], side: [0.5, 0.7, 0.92] },
     [BlockType.MOSSY_COBBLE]:{ top: [0.35, 0.45, 0.32], bottom: [0.35, 0.45, 0.32], side: [0.33, 0.43, 0.3] },
+    [BlockType.EASTER_EGG]:  { top: [0.95, 0.45, 0.85], bottom: [0.95, 0.45, 0.85], side: [0.9, 0.4, 0.8] },
+    [BlockType.GOLDEN_EGG]:  { top: [1.0, 0.84, 0.0], bottom: [1.0, 0.84, 0.0], side: [1.0, 0.84, 0.0] },
+    [BlockType.CANDY_RED]:   { top: [0.9, 0.2, 0.2], bottom: [0.9, 0.2, 0.2], side: [0.85, 0.15, 0.15] },
+    [BlockType.CANDY_WHITE]: { top: [0.95, 0.95, 0.95], bottom: [0.95, 0.95, 0.95], side: [0.92, 0.92, 0.92] },
+    [BlockType.CANDY_BLUE]:  { top: [0.2, 0.4, 0.9], bottom: [0.2, 0.4, 0.9], side: [0.15, 0.35, 0.85] },
+    [BlockType.DIAMOND_EGG]: { top: [0.4, 0.9, 1.0], bottom: [0.4, 0.9, 1.0], side: [0.4, 0.9, 1.0] },
+    [BlockType.LAVA]:        { top: [0.9, 0.3, 0.0], bottom: [0.9, 0.3, 0.0], side: [0.9, 0.3, 0.0] },
 };
 
 export function isBlockSolid(type) {
