@@ -5,8 +5,8 @@ const GRAVITY = 25;
 const FLY_SPEED = 15;
 const FLY_SPRINT_SPEED = 40;
 const PLAYER_WIDTH = 0.3;
-const MOUSE_SENSITIVITY = 0.002;
-const TOUCH_LOOK_SENSITIVITY = 0.0035;
+const MOUSE_SENSITIVITY = 0.0032;
+const TOUCH_LOOK_SENSITIVITY = 0.0055;
 
 export class Player {
     constructor(camera, world, audio) {
