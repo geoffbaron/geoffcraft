@@ -7,20 +7,74 @@ import { createTextureAtlas } from './textures.js';
 import { Bunny } from './bunny.js';
 import { AudioManager } from './audio.js';
 
+function detectPerformanceProfile() {
+    const params = new URLSearchParams(window.location.search);
+    const forced = params.get('performance');
+    if (forced === 'low') return buildProfile('low');
+    if (forced === 'high') return buildProfile('high');
+
+    const threads = navigator.hardwareConcurrency || 4;
+    const memory = navigator.deviceMemory || 4;
+    const isSmallScreen = Math.min(window.innerWidth, window.innerHeight) < 900;
+    const isLowSpec = threads <= 4 || memory <= 4 || isSmallScreen;
+    return buildProfile(isLowSpec ? 'low' : 'high');
+}
+
+function buildProfile(mode) {
+    if (mode === 'low') {
+        return {
+            mode,
+            maxPixelRatio: 1,
+            renderDistance: 5,
+            preloadRadius: 1,
+            maxGeneratePerFrame: 1,
+            maxMeshBuildsPerFrame: 1,
+            unloadPadding: 1,
+            cloudCount: 10,
+            bunnyCount: 6,
+            torchLightCount: 0,
+            enableShadows: false,
+            shadowMapSize: 512,
+            animateClouds: false,
+            animateWater: false,
+            showSun: false,
+        };
+    }
+
+    return {
+        mode,
+        maxPixelRatio: 1.5,
+        renderDistance: 8,
+        preloadRadius: 2,
+        maxGeneratePerFrame: 2,
+        maxMeshBuildsPerFrame: 3,
+        unloadPadding: 2,
+        cloudCount: 20,
+        bunnyCount: 12,
+        torchLightCount: 12,
+        enableShadows: true,
+        shadowMapSize: 1024,
+        animateClouds: true,
+        animateWater: true,
+        showSun: true,
+    };
+}
+
 class Game {
     constructor() {
         this.canvas = document.getElementById('game-canvas');
         this.menuScreen = document.getElementById('menu-screen');
         this.started = false;
+        this.performance = detectPerformanceProfile();
 
         this.audio = new AudioManager();
 
         // Renderer
-        this.renderer = new THREE.WebGLRenderer({ canvas: this.canvas, antialias: false });
+        this.renderer = new THREE.WebGLRenderer({ canvas: this.canvas, antialias: false, powerPreference: 'low-power' });
         this.renderer.setSize(window.innerWidth, window.innerHeight);
-        this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, this.performance.maxPixelRatio));
         this.renderer.setClearColor(0x87CEEB);
-        this.renderer.shadowMap.enabled = true;
+        this.renderer.shadowMap.enabled = this.performance.enableShadows;
         this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
         // Scene
@@ -36,9 +90,9 @@ class Game {
 
         this.dirLight = new THREE.DirectionalLight(0xffffff, 1.2);
         this.dirLight.position.set(50, 100, 30);
-        this.dirLight.castShadow = true;
-        this.dirLight.shadow.mapSize.width = 2048;
-        this.dirLight.shadow.mapSize.height = 2048;
+        this.dirLight.castShadow = this.performance.enableShadows;
+        this.dirLight.shadow.mapSize.width = this.performance.shadowMapSize;
+        this.dirLight.shadow.mapSize.height = this.performance.shadowMapSize;
         this.dirLight.shadow.camera.near = 0.5;
         this.dirLight.shadow.camera.far = 150;
         this.dirLight.shadow.camera.left = -50;
@@ -53,6 +107,7 @@ class Game {
         const sunGeo = new THREE.BoxGeometry(10, 10, 10);
         const sunMat = new THREE.MeshBasicMaterial({ color: 0xffffaa });
         this.sunMesh = new THREE.Mesh(sunGeo, sunMat);
+        this.sunMesh.visible = this.performance.showSun;
         this.scene.add(this.sunMesh);
 
         const hemisphereLight = new THREE.HemisphereLight(0x87CEEB, 0x556633, 0.4);
@@ -62,12 +117,17 @@ class Game {
         this.faceTextures = createTextureAtlas();
 
         // World
-        this.world = new World(this.scene);
+        this.world = new World(this.scene, 42, {
+            renderDistance: this.performance.renderDistance,
+            unloadPadding: this.performance.unloadPadding,
+            maxGeneratePerFrame: this.performance.maxGeneratePerFrame,
+            maxMeshBuildsPerFrame: this.performance.maxMeshBuildsPerFrame,
+        });
         this.world.setTextures(this.faceTextures);
 
         // Pre-generate spawn area and build meshes
-        for (let dx = -3; dx <= 3; dx++) {
-            for (let dz = -3; dz <= 3; dz++) {
+        for (let dx = -this.performance.preloadRadius; dx <= this.performance.preloadRadius; dx++) {
+            for (let dz = -this.performance.preloadRadius; dz <= this.performance.preloadRadius; dz++) {
                 this.world.generateChunk(dx, dz);
             }
         }
@@ -80,17 +140,17 @@ class Game {
         this.clouds = new THREE.Group();
         const cloudGeo = new THREE.BoxGeometry(16, 4, 24);
         const cloudMat = new THREE.MeshLambertMaterial({ color: 0xffffff, transparent: true, opacity: 0.8 });
-        for(let i = 0; i < 30; i++) {
+        for(let i = 0; i < this.performance.cloudCount; i++) {
             const mesh = new THREE.Mesh(cloudGeo, cloudMat);
             mesh.position.set((Math.random() - 0.5) * 300, 110 + Math.random() * 20, (Math.random() - 0.5) * 300);
-            mesh.castShadow = true;
+            mesh.castShadow = this.performance.enableShadows;
             this.clouds.add(mesh);
         }
         this.scene.add(this.clouds);
 
-        // Torch light pool — up to 24 flickering PointLights for cave torches
+        // Torch light pool — point lights are disabled on lower-end devices
         this.torchLights = [];
-        for (let i = 0; i < 24; i++) {
+        for (let i = 0; i < this.performance.torchLightCount; i++) {
             const pl = new THREE.PointLight(0xff7722, 0, 14, 2);
             pl.visible = false;
             this.scene.add(pl);
@@ -105,7 +165,7 @@ class Game {
 
         // Spawn Giant Hopping Bunnies
         this.bunnies = [];
-        for (let i = 0; i < 15; i++) {
+        for (let i = 0; i < this.performance.bunnyCount; i++) {
             const bx = this.player.position.x + (Math.random() - 0.5) * 100;
             const bz = this.player.position.z + (Math.random() - 0.5) * 100;
             const by = 130; // drop from sky
@@ -132,6 +192,10 @@ class Game {
         this.fps = 0;
         this.lastFpsTime = performance.now();
         this.lastTime = performance.now();
+        this.debugUpdateTimer = 0;
+        this.highlightCheckTimer = 0;
+        this.highlightOrigin = new THREE.Vector3();
+        this.sunOffset = new THREE.Vector3(40, 80, 20);
 
         // Block break/place cooldown
         this.actionCooldown = 0;
@@ -175,6 +239,7 @@ class Game {
             this.camera.aspect = window.innerWidth / window.innerHeight;
             this.camera.updateProjectionMatrix();
             this.renderer.setSize(window.innerWidth, window.innerHeight);
+            this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, this.performance.maxPixelRatio));
         });
 
         // Block interaction
@@ -266,7 +331,20 @@ class Game {
     start() {
         this.started = true;
         this.menuScreen.style.display = 'none';
-        this.canvas.requestPointerLock();
+        if (navigator.webdriver) {
+            this.player.mouseLocked = true;
+            return;
+        }
+        try {
+            const pointerLockResult = this.canvas.requestPointerLock?.();
+            if (pointerLockResult && typeof pointerLockResult.catch === 'function') {
+                pointerLockResult.catch(() => {
+                    this.player.mouseLocked = true;
+                });
+            }
+        } catch (error) {
+            this.player.mouseLocked = true;
+        }
     }
 
     animate() {
@@ -290,30 +368,33 @@ class Game {
         this.world.update(this.player.position.x, this.player.position.z);
 
         // Update light and sun position to follow player continuously
-        const sunOffset = new THREE.Vector3(40, 80, 20);
-        this.dirLight.position.copy(this.player.position).add(sunOffset);
+        this.dirLight.position.copy(this.player.position).add(this.sunOffset);
         this.dirLight.target.position.copy(this.player.position);
         this.sunMesh.position.copy(this.dirLight.position);
 
         // Animate clouds
-        for (const cloud of this.clouds.children) {
-            cloud.position.x += 4 * dt;
-            cloud.position.z += 2 * dt;
-            if (cloud.position.x - this.player.position.x > 150) {
-                cloud.position.x = this.player.position.x - 150;
-                cloud.position.z = this.player.position.z + (Math.random() - 0.5) * 300;
-            }
-            if (cloud.position.z - this.player.position.z > 150) {
-                cloud.position.z = this.player.position.z - 150;
-                cloud.position.x = this.player.position.x + (Math.random() - 0.5) * 300;
+        if (this.performance.animateClouds) {
+            for (const cloud of this.clouds.children) {
+                cloud.position.x += 4 * dt;
+                cloud.position.z += 2 * dt;
+                if (cloud.position.x - this.player.position.x > 150) {
+                    cloud.position.x = this.player.position.x - 150;
+                    cloud.position.z = this.player.position.z + (Math.random() - 0.5) * 300;
+                }
+                if (cloud.position.z - this.player.position.z > 150) {
+                    cloud.position.z = this.player.position.z - 150;
+                    cloud.position.x = this.player.position.x + (Math.random() - 0.5) * 300;
+                }
             }
         }
 
         // Update flickering torch lights
-        this.updateTorchLights(dt, now);
+        if (this.torchLights.length > 0) {
+            this.updateTorchLights(dt, now);
+        }
 
         // Animate water flowing
-        if (this.faceTextures && this.faceTextures[BlockType.WATER]) {
+        if (this.performance.animateWater && this.faceTextures && this.faceTextures[BlockType.WATER]) {
             const time = now / 1000;
             this.faceTextures[BlockType.WATER].top.offset.set(time * 0.05, time * 0.05);
             this.faceTextures[BlockType.WATER].side.offset.set(time * 0.05, time * 0.05);
@@ -322,27 +403,37 @@ class Game {
         if (this.started && this.player.mouseLocked) {
             this.player.update(dt);
             for (const bunny of this.bunnies) {
-                bunny.update(dt);
+                const dx = bunny.position.x - this.player.position.x;
+                const dz = bunny.position.z - this.player.position.z;
+                if (dx * dx + dz * dz < 140 * 140) {
+                    bunny.update(dt);
+                }
             }
 
             // Block highlight
-            const origin = this.camera.position.clone();
-            const dir = this.player.getLookDirection();
-            const hit = this.world.raycast(origin, dir);
-            if (hit) {
-                this.highlightMesh.visible = true;
-                this.highlightMesh.position.set(
-                    hit.block.x + 0.5,
-                    hit.block.y + 0.5,
-                    hit.block.z + 0.5
-                );
-            } else {
-                this.highlightMesh.visible = false;
+            this.highlightCheckTimer -= dt;
+            if (this.highlightCheckTimer <= 0) {
+                this.highlightCheckTimer = this.performance.mode === 'low' ? 0.08 : 0.03;
+                const hit = this.world.raycast(this.highlightOrigin.copy(this.camera.position), this.player.getLookDirection());
+                if (hit) {
+                    this.highlightMesh.visible = true;
+                    this.highlightMesh.position.set(
+                        hit.block.x + 0.5,
+                        hit.block.y + 0.5,
+                        hit.block.z + 0.5
+                    );
+                } else {
+                    this.highlightMesh.visible = false;
+                }
             }
         }
 
         // Update debug info
-        this.ui.updateDebugInfo(this.player, this.fps);
+        this.debugUpdateTimer -= dt;
+        if (this.debugUpdateTimer <= 0) {
+            this.debugUpdateTimer = 0.2;
+            this.ui.updateDebugInfo(this.player, this.fps, this.performance.mode);
+        }
 
         // Easter Egg Timer
         if (this.started && !this.gameOver) {

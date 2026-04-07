@@ -3,13 +3,19 @@ import { BlockType, isBlockSolid } from './blocks.js';
 import { Noise } from './noise.js';
 import { chunkStructureHash, generateVillage, generateCastle, generateWatchtower, generateRuins } from './structures.js';
 
-const RENDER_DISTANCE = 8;
 const WATER_LEVEL = 32;
 
 export class World {
-    constructor(scene, seed = 42) {
+    constructor(scene, seed = 42, options = {}) {
         this.scene = scene;
         this.seed = seed;
+        this.options = {
+            renderDistance: options.renderDistance ?? 8,
+            unloadPadding: options.unloadPadding ?? 2,
+            maxGeneratePerFrame: options.maxGeneratePerFrame ?? 2,
+            maxMeshBuildsPerFrame: options.maxMeshBuildsPerFrame ?? 3,
+            waterTickInterval: options.waterTickInterval ?? 0.1,
+        };
         this.chunks = new Map();
         this.noise = new Noise(seed);
         this.treeNoise = new Noise(seed + 100);
@@ -573,12 +579,13 @@ export class World {
     update(playerX, playerZ) {
         const pcx = Math.floor(playerX / CHUNK_SIZE);
         const pcz = Math.floor(playerZ / CHUNK_SIZE);
+        const renderDistance = this.options.renderDistance;
 
         // Generate new chunks
         const chunksToGenerate = [];
-        for (let dx = -RENDER_DISTANCE; dx <= RENDER_DISTANCE; dx++) {
-            for (let dz = -RENDER_DISTANCE; dz <= RENDER_DISTANCE; dz++) {
-                if (dx * dx + dz * dz > RENDER_DISTANCE * RENDER_DISTANCE) continue;
+        for (let dx = -renderDistance; dx <= renderDistance; dx++) {
+            for (let dz = -renderDistance; dz <= renderDistance; dz++) {
+                if (dx * dx + dz * dz > renderDistance * renderDistance) continue;
                 const cx = pcx + dx;
                 const cz = pcz + dz;
                 const key = this.chunkKey(cx, cz);
@@ -590,15 +597,14 @@ export class World {
 
         // Sort by distance, generate closest first
         chunksToGenerate.sort((a, b) => a.dist - b.dist);
-        const maxGenPerFrame = 2;
-        for (let i = 0; i < Math.min(maxGenPerFrame, chunksToGenerate.length); i++) {
+        for (let i = 0; i < Math.min(this.options.maxGeneratePerFrame, chunksToGenerate.length); i++) {
             const { cx, cz } = chunksToGenerate[i];
             this.generateChunk(cx, cz);
         }
 
         // Water simulation tick (~10 times per second)
         this.waterTickTimer += 0.016; // approximate dt
-        if (this.waterTickTimer > 0.1) {
+        if (this.waterTickTimer > this.options.waterTickInterval) {
             this.tickWater();
             this.waterTickTimer = 0;
         }
@@ -606,7 +612,7 @@ export class World {
         // Build/rebuild dirty chunk meshes
         let meshBuilds = 0;
         for (const [key, chunk] of this.chunks) {
-            if (chunk.dirty && meshBuilds < 3) {
+            if (chunk.dirty && meshBuilds < this.options.maxMeshBuildsPerFrame) {
                 if (this.faceTextures) {
                     chunk.buildTexturedMesh(this.faceTextures);
                 } else {
@@ -620,7 +626,8 @@ export class World {
         for (const [key, chunk] of this.chunks) {
             const dx = chunk.cx - pcx;
             const dz = chunk.cz - pcz;
-            if (dx * dx + dz * dz > (RENDER_DISTANCE + 2) * (RENDER_DISTANCE + 2)) {
+            const unloadDistance = renderDistance + this.options.unloadPadding;
+            if (dx * dx + dz * dz > unloadDistance * unloadDistance) {
                 chunk.dispose();
                 this.chunks.delete(key);
             }

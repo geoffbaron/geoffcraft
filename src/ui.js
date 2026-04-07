@@ -24,11 +24,12 @@ export class UI {
         this.debugEl = document.getElementById('debug-info');
     }
 
-    updateDebugInfo(player, fps) {
+    updateDebugInfo(player, fps, performanceMode = 'high') {
         const pos = player.position;
         this.debugEl.innerHTML = [
             `EasterCraft`,
             `FPS: ${fps}`,
+            `Mode: ${performanceMode}`,
             `XYZ: ${pos.x.toFixed(1)} / ${pos.y.toFixed(1)} / ${pos.z.toFixed(1)}`,
             `Chunk: ${Math.floor(pos.x / 16)}, ${Math.floor(pos.z / 16)}`,
         ].filter(Boolean).join('<br>');

@@ -12,6 +12,7 @@ export class Bunny {
         this.world = world;
         this.position = new THREE.Vector3(x, y, z);
         this.velocity = new THREE.Vector3(0, 0, 0);
+        this.newPos = new THREE.Vector3();
         this.onGround = false;
         
         this.stateTimer = Math.random() * 2 + 1;
@@ -115,7 +116,7 @@ export class Bunny {
     }
     
     moveWithCollision(dt) {
-        const newPos = this.position.clone();
+        const newPos = this.newPos.copy(this.position);
 
         newPos.x += this.velocity.x * dt;
         if (this.collidesAt(newPos)) { newPos.x = this.position.x; this.velocity.x = 0; }

@@ -32,6 +32,11 @@ export class Player {
 
         this.keys = {};
         this.mouseLocked = false;
+        this.forwardDir = new THREE.Vector3();
+        this.rightDir = new THREE.Vector3();
+        this.lookDir = new THREE.Vector3();
+        this.moveDir = new THREE.Vector3();
+        this.newPos = new THREE.Vector3();
 
         this.setupControls();
     }
@@ -60,7 +65,7 @@ export class Player {
     }
 
     getForwardDir() {
-        return new THREE.Vector3(
+        return this.forwardDir.set(
             -Math.sin(this.rotation.y),
             0,
             -Math.cos(this.rotation.y)
@@ -68,7 +73,7 @@ export class Player {
     }
 
     getRightDir() {
-        return new THREE.Vector3(
+        return this.rightDir.set(
             Math.cos(this.rotation.y),
             0,
             -Math.sin(this.rotation.y)
@@ -76,11 +81,11 @@ export class Player {
     }
 
     getLookDirection() {
-        const dir = new THREE.Vector3();
-        dir.x = -Math.sin(this.rotation.y) * Math.cos(this.rotation.x);
-        dir.y = Math.sin(this.rotation.x);
-        dir.z = -Math.cos(this.rotation.y) * Math.cos(this.rotation.x);
-        return dir.normalize();
+        return this.lookDir.set(
+            -Math.sin(this.rotation.y) * Math.cos(this.rotation.x),
+            Math.sin(this.rotation.x),
+            -Math.cos(this.rotation.y) * Math.cos(this.rotation.x)
+        ).normalize();
     }
 
     update(dt) {
@@ -90,7 +95,7 @@ export class Player {
 
         const forward = this.getForwardDir();
         const right = this.getRightDir();
-        const moveDir = new THREE.Vector3(0, 0, 0);
+        const moveDir = this.moveDir.set(0, 0, 0);
 
         if (this.keys['KeyW'] || this.keys['ArrowUp']) moveDir.add(forward);
         if (this.keys['KeyS'] || this.keys['ArrowDown']) moveDir.sub(forward);
@@ -144,7 +149,7 @@ export class Player {
 
     moveWithCollision(dt) {
         // Move each axis independently for better collision
-        const newPos = this.position.clone();
+        const newPos = this.newPos.copy(this.position);
 
         // X axis
         newPos.x += this.velocity.x * dt;
