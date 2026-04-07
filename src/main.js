@@ -60,12 +60,32 @@ function buildProfile(mode) {
     };
 }
 
+function isTouchDevice() {
+    return window.matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 0;
+}
+
 class Game {
     constructor() {
         this.canvas = document.getElementById('game-canvas');
         this.menuScreen = document.getElementById('menu-screen');
+        this.mobileControls = document.getElementById('mobile-controls');
+        this.mobileJoystick = document.getElementById('mobile-joystick');
+        this.mobileStick = document.getElementById('mobile-stick');
+        this.jumpButton = document.getElementById('jump-button');
+        this.digButton = document.getElementById('dig-button');
         this.started = false;
         this.performance = detectPerformanceProfile();
+        this.isMobile = isTouchDevice();
+        this.touchLookId = null;
+        this.touchLookLastX = 0;
+        this.touchLookLastY = 0;
+        this.joystickId = null;
+        this.joystickVector = { x: 0, y: 0 };
+
+        if (this.isMobile) {
+            this.mobileControls.classList.remove('hidden');
+            this.menuScreen.querySelector('p').textContent = 'Tap to Play';
+        }
 
         this.audio = new AudioManager();
 
@@ -223,6 +243,10 @@ class Game {
             this.audio.init();
             this.start();
         });
+        this.menuScreen.addEventListener('touchstart', () => {
+            this.audio.init();
+            this.start();
+        }, { passive: true });
 
         // Pointer lock
         document.addEventListener('pointerlockchange', () => {
@@ -248,89 +272,26 @@ class Game {
             if (this.gameOver) return;
             if (this.actionCooldown > 0) return;
 
-            const origin = this.camera.position.clone();
-            const dir = this.player.getLookDirection();
-            const hit = this.world.raycast(origin, dir);
-
-            if (!hit) return;
-
             if (e.button === 0) {
-                // Left click - break
-                // Award Egg Collectible logic if an Egg was struck!
-                if (hit.block.type === BlockType.EASTER_EGG || hit.block.type === BlockType.GOLDEN_EGG || hit.block.type === BlockType.DIAMOND_EGG) {
-                    this.world.setBlock(hit.block.x, hit.block.y, hit.block.z, BlockType.AIR);
-                    let points = 1;
-                    if (hit.block.type === BlockType.EASTER_EGG) { this.eggsFound += 1; }
-                    else if (hit.block.type === BlockType.GOLDEN_EGG) { this.eggsFound += 10; points = 10; }
-                    else if (hit.block.type === BlockType.DIAMOND_EGG) { this.eggsFound += 30; points = 30; }
-                    
-                    this.audio.playEggCollect(points);
-                    this.ui.updateHunterHUD(Math.ceil(this.timeLeft), this.eggsFound);
-                    this.actionCooldown = 0.2;
-                    return;
-                }
-
-                if (hit.block.type === BlockType.MUSHROOM) {
-                    this.world.setBlock(hit.block.x, hit.block.y, hit.block.z, BlockType.AIR);
-                    this.player.height *= 3;
-                    this.player.camera.position.y += this.player.height * (2/3); 
-                    this.audio.playPowerup();
-                    this.actionCooldown = 0.2;
-                    return;
-                }
-
-                if (hit.block.type === BlockType.FEATHER) {
-                    this.world.setBlock(hit.block.x, hit.block.y, hit.block.z, BlockType.AIR);
-                    this.player.canFly = true;
-                    this.audio.playPowerup();
-                    this.actionCooldown = 0.2;
-                    return;
-                }
-
-                if (hit.block.type === BlockType.FROG) {
-                    this.world.setBlock(hit.block.x, hit.block.y, hit.block.z, BlockType.AIR);
-                    this.player.jumpForce *= 3;
-                    this.audio.playPowerup();
-                    this.actionCooldown = 0.2;
-                    return;
-                }
-
-                if (hit.block.type === BlockType.SHOE) {
-                    this.world.setBlock(hit.block.x, hit.block.y, hit.block.z, BlockType.AIR);
-                    this.player.moveSpeed *= 3;
-                    this.player.sprintSpeed *= 3;
-                    this.audio.playPowerup();
-                    this.actionCooldown = 0.2;
-                    return;
-                }
-
-                if (hit.block.type === BlockType.DYNAMITE) {
-                    this.world.setBlock(hit.block.x, hit.block.y, hit.block.z, BlockType.AIR);
-                    this.player.hasDynamite = true;
-                    this.audio.playPowerup();
-                    this.actionCooldown = 0.2;
-                    return;
-                }
-                
-                // If mining an generic terrain block
-                if (this.player.hasDynamite) {
-                    this.audio.playExplosion();
-                    this.world.createExplosion(hit.block.x, hit.block.y, hit.block.z, 4);
-                } else {
-                    this.audio.playDig();
-                    this.world.setBlock(hit.block.x, hit.block.y, hit.block.z, BlockType.AIR);
-                }
-                this.actionCooldown = 0.2;
+                this.handlePrimaryAction();
             }
         });
 
         // Prevent context menu
         this.canvas.addEventListener('contextmenu', (e) => e.preventDefault());
+
+        if (this.isMobile) {
+            this.setupMobileControls();
+        }
     }
 
     start() {
         this.started = true;
         this.menuScreen.style.display = 'none';
+        if (this.isMobile) {
+            this.player.mouseLocked = true;
+            return;
+        }
         if (navigator.webdriver) {
             this.player.mouseLocked = true;
             return;
@@ -345,6 +306,189 @@ class Game {
         } catch (error) {
             this.player.mouseLocked = true;
         }
+    }
+
+    setupMobileControls() {
+        const preventDefault = (event) => event.preventDefault();
+        this.mobileControls.addEventListener('touchstart', preventDefault, { passive: false });
+        this.mobileControls.addEventListener('touchmove', preventDefault, { passive: false });
+
+        this.mobileJoystick.addEventListener('pointerdown', (event) => {
+            this.joystickId = event.pointerId;
+            this.mobileJoystick.setPointerCapture(event.pointerId);
+            this.updateJoystick(event);
+        });
+
+        this.mobileJoystick.addEventListener('pointermove', (event) => {
+            if (event.pointerId !== this.joystickId) return;
+            this.updateJoystick(event);
+        });
+
+        const releaseJoystick = (event) => {
+            if (event.pointerId !== this.joystickId) return;
+            this.joystickId = null;
+            this.joystickVector.x = 0;
+            this.joystickVector.y = 0;
+            this.syncMobileMovementKeys();
+            this.mobileStick.style.transform = 'translate(-50%, -50%)';
+        };
+
+        this.mobileJoystick.addEventListener('pointerup', releaseJoystick);
+        this.mobileJoystick.addEventListener('pointercancel', releaseJoystick);
+
+        const bindHoldButton = (button, code) => {
+            const release = () => {
+                button.classList.remove('is-pressed');
+                this.player.keys[code] = false;
+            };
+
+            button.addEventListener('pointerdown', (event) => {
+                event.preventDefault();
+                button.classList.add('is-pressed');
+                this.player.keys[code] = true;
+            });
+            button.addEventListener('pointerup', release);
+            button.addEventListener('pointercancel', release);
+            button.addEventListener('pointerleave', release);
+        };
+
+        bindHoldButton(this.jumpButton, 'Space');
+
+        const releaseDig = () => this.digButton.classList.remove('is-pressed');
+        this.digButton.addEventListener('pointerdown', (event) => {
+            event.preventDefault();
+            this.digButton.classList.add('is-pressed');
+            this.handlePrimaryAction();
+        });
+        this.digButton.addEventListener('pointerup', releaseDig);
+        this.digButton.addEventListener('pointercancel', releaseDig);
+        this.digButton.addEventListener('pointerleave', releaseDig);
+
+        this.canvas.addEventListener('pointerdown', (event) => {
+            if (!this.started || event.pointerType !== 'touch') return;
+            if (event.clientX < window.innerWidth * 0.45) return;
+            this.touchLookId = event.pointerId;
+            this.touchLookLastX = event.clientX;
+            this.touchLookLastY = event.clientY;
+            this.canvas.setPointerCapture(event.pointerId);
+        });
+
+        this.canvas.addEventListener('pointermove', (event) => {
+            if (event.pointerId !== this.touchLookId) return;
+            const dx = event.clientX - this.touchLookLastX;
+            const dy = event.clientY - this.touchLookLastY;
+            this.touchLookLastX = event.clientX;
+            this.touchLookLastY = event.clientY;
+            this.player.applyTouchLook(dx, dy);
+        });
+
+        const releaseLook = (event) => {
+            if (event.pointerId !== this.touchLookId) return;
+            this.touchLookId = null;
+        };
+        this.canvas.addEventListener('pointerup', releaseLook);
+        this.canvas.addEventListener('pointercancel', releaseLook);
+    }
+
+    updateJoystick(event) {
+        const rect = this.mobileJoystick.getBoundingClientRect();
+        const radius = rect.width * 0.35;
+        const centerX = rect.left + rect.width / 2;
+        const centerY = rect.top + rect.height / 2;
+        let dx = event.clientX - centerX;
+        let dy = event.clientY - centerY;
+        const distance = Math.hypot(dx, dy);
+
+        if (distance > radius) {
+            const scale = radius / distance;
+            dx *= scale;
+            dy *= scale;
+        }
+
+        this.joystickVector.x = dx / radius;
+        this.joystickVector.y = dy / radius;
+        this.mobileStick.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
+        this.syncMobileMovementKeys();
+    }
+
+    syncMobileMovementKeys() {
+        const deadZone = 0.22;
+        this.player.keys.KeyA = this.joystickVector.x < -deadZone;
+        this.player.keys.KeyD = this.joystickVector.x > deadZone;
+        this.player.keys.KeyW = this.joystickVector.y < -deadZone;
+        this.player.keys.KeyS = this.joystickVector.y > deadZone;
+    }
+
+    handlePrimaryAction() {
+        if (!this.player.mouseLocked || this.gameOver || this.actionCooldown > 0) return;
+
+        const hit = this.world.raycast(this.highlightOrigin.copy(this.camera.position), this.player.getLookDirection());
+        if (!hit) return;
+
+        const type = hit.block.type;
+        if (type === BlockType.EASTER_EGG || type === BlockType.GOLDEN_EGG || type === BlockType.DIAMOND_EGG) {
+            this.world.setBlock(hit.block.x, hit.block.y, hit.block.z, BlockType.AIR);
+            let points = 1;
+            if (type === BlockType.EASTER_EGG) this.eggsFound += 1;
+            else if (type === BlockType.GOLDEN_EGG) { this.eggsFound += 10; points = 10; }
+            else { this.eggsFound += 30; points = 30; }
+
+            this.audio.playEggCollect(points);
+            this.ui.updateHunterHUD(Math.ceil(this.timeLeft), this.eggsFound);
+            this.actionCooldown = 0.2;
+            return;
+        }
+
+        if (type === BlockType.MUSHROOM) {
+            this.world.setBlock(hit.block.x, hit.block.y, hit.block.z, BlockType.AIR);
+            this.player.height *= 3;
+            this.player.camera.position.y += this.player.height * (2 / 3);
+            this.audio.playPowerup();
+            this.actionCooldown = 0.2;
+            return;
+        }
+
+        if (type === BlockType.FEATHER) {
+            this.world.setBlock(hit.block.x, hit.block.y, hit.block.z, BlockType.AIR);
+            this.player.canFly = true;
+            this.audio.playPowerup();
+            this.actionCooldown = 0.2;
+            return;
+        }
+
+        if (type === BlockType.FROG) {
+            this.world.setBlock(hit.block.x, hit.block.y, hit.block.z, BlockType.AIR);
+            this.player.jumpForce *= 3;
+            this.audio.playPowerup();
+            this.actionCooldown = 0.2;
+            return;
+        }
+
+        if (type === BlockType.SHOE) {
+            this.world.setBlock(hit.block.x, hit.block.y, hit.block.z, BlockType.AIR);
+            this.player.moveSpeed *= 3;
+            this.player.sprintSpeed *= 3;
+            this.audio.playPowerup();
+            this.actionCooldown = 0.2;
+            return;
+        }
+
+        if (type === BlockType.DYNAMITE) {
+            this.world.setBlock(hit.block.x, hit.block.y, hit.block.z, BlockType.AIR);
+            this.player.hasDynamite = true;
+            this.audio.playPowerup();
+            this.actionCooldown = 0.2;
+            return;
+        }
+
+        if (this.player.hasDynamite) {
+            this.audio.playExplosion();
+            this.world.createExplosion(hit.block.x, hit.block.y, hit.block.z, 4);
+        } else {
+            this.audio.playDig();
+            this.world.setBlock(hit.block.x, hit.block.y, hit.block.z, BlockType.AIR);
+        }
+        this.actionCooldown = 0.2;
     }
 
     animate() {

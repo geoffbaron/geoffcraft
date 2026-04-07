@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
     <title>EasterCraft</title>
     <link rel="stylesheet" href="styles.css">
 </head>
@@ -13,6 +13,7 @@
         <div class="controls-info">
             <p>WASD - Move | Space - Jump | Shift - Sprint</p>
             <p>Left Click - Dig / Collect Egg | Esc - Pause</p>
+            <p class="mobile-hint">On iPhone: drag left to move, drag right to look, tap Jump or Dig.</p>
         </div>
         <div class="egg-points-info" style="margin-top: 25px; font-size: 18px; text-shadow: 2px 2px 4px rgba(0,0,0,0.5);">
             <span style="color: white;">🥚 Easter Egg: <strong>1 pt</strong></span> &nbsp; &nbsp;
@@ -28,6 +29,15 @@
         </div>
         <div id="crosshair">+</div>
         <div id="debug-info"></div>
+    </div>
+    <div id="mobile-controls" class="hidden">
+        <div id="mobile-joystick" class="mobile-pad">
+            <div id="mobile-stick"></div>
+        </div>
+        <div id="mobile-actions">
+            <button id="jump-button" class="mobile-button">Jump</button>
+            <button id="dig-button" class="mobile-button mobile-button-accent">Dig</button>
+        </div>
     </div>
     
     <div id="game-over-screen" class="hidden">

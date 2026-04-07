@@ -6,6 +6,7 @@ const FLY_SPEED = 15;
 const FLY_SPRINT_SPEED = 40;
 const PLAYER_WIDTH = 0.3;
 const MOUSE_SENSITIVITY = 0.002;
+const TOUCH_LOOK_SENSITIVITY = 0.0035;
 
 export class Player {
     constructor(camera, world, audio) {
@@ -58,10 +59,18 @@ export class Player {
         });
         document.addEventListener('mousemove', (e) => {
             if (!this.mouseLocked) return;
-            this.rotation.y -= e.movementX * MOUSE_SENSITIVITY;
-            this.rotation.x -= e.movementY * MOUSE_SENSITIVITY;
-            this.rotation.x = Math.max(-Math.PI / 2 + 0.01, Math.min(Math.PI / 2 - 0.01, this.rotation.x));
+            this.applyLookDelta(e.movementX * MOUSE_SENSITIVITY, e.movementY * MOUSE_SENSITIVITY);
         });
+    }
+
+    applyLookDelta(deltaX, deltaY, sensitivity = 1) {
+        this.rotation.y -= deltaX * sensitivity;
+        this.rotation.x -= deltaY * sensitivity;
+        this.rotation.x = Math.max(-Math.PI / 2 + 0.01, Math.min(Math.PI / 2 - 0.01, this.rotation.x));
+    }
+
+    applyTouchLook(deltaX, deltaY) {
+        this.applyLookDelta(deltaX, deltaY, TOUCH_LOOK_SENSITIVITY);
     }
 
     getForwardDir() {
